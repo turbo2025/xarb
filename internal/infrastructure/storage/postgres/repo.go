@@ -1,12 +1,10 @@
-package sqlite
+package postgres
 
 import (
 	"context"
 	"database/sql"
-	"os"
-	"path/filepath"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"xarb/internal/application/port"
 )
@@ -15,17 +13,13 @@ type Repo struct {
 	db *sql.DB
 }
 
-func New(path string) (*Repo, error) {
-	// ensure directory exists
-	if dir := filepath.Dir(path); dir != "." && dir != "" {
-		_ = os.MkdirAll(dir, 0o755)
-	}
-
-	db, err := sql.Open("sqlite", path)
+func New(dsn string) (*Repo, error) {
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
 
 	r := &Repo{db: db}
 	if err := r.migrate(context.Background()); err != nil {
@@ -38,11 +32,10 @@ func New(path string) (*Repo, error) {
 func (r *Repo) Close() error { return r.db.Close() }
 
 func (r *Repo) migrate(ctx context.Context) error {
-	// snapshots table
 	_, err := r.db.ExecContext(ctx, `
 CREATE TABLE IF NOT EXISTS snapshots (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ts_ms INTEGER NOT NULL,
+  id BIGSERIAL PRIMARY KEY,
+  ts_ms BIGINT NOT NULL,
   payload TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_snapshots_ts ON snapshots(ts_ms);
@@ -51,17 +44,16 @@ CREATE INDEX IF NOT EXISTS idx_snapshots_ts ON snapshots(ts_ms);
 }
 
 func (r *Repo) UpsertLatestPrice(ctx context.Context, ex, symbol string, price float64, ts int64) error {
-	// sqlite: keep it minimal; later you can add a latest table if needed
+	// optional: add latest table later
 	return nil
 }
 
 func (r *Repo) InsertSnapshot(ctx context.Context, ts int64, payload string) error {
-	_, err := r.db.ExecContext(ctx, `INSERT INTO snapshots(ts_ms, payload) VALUES(?, ?)`, ts, payload)
+	_, err := r.db.ExecContext(ctx, `INSERT INTO snapshots(ts_ms, payload) VALUES($1, $2)`, ts, payload)
 	return err
 }
 
 func (r *Repo) InsertSignal(ctx context.Context, ts int64, symbol string, delta float64, payload string) error {
-	// later: signals table
 	return nil
 }
 

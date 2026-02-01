@@ -128,3 +128,33 @@ func (s *State) Snapshot() map[string]symState {
 	}
 	return out
 }
+
+func (s *State) DeltaBand(symbol string, threshold float64) (delta float64, band int, ok bool) {
+	sym := strings.ToUpper(strings.TrimSpace(symbol))
+	if sym == "" || threshold <= 0 {
+		return 0, 0, false
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	st := s.syms[sym]
+	if st == nil {
+		return 0, 0, false
+	}
+
+	// 只有两边都 parse & has 才能算 delta
+	if !(st.b.parse && st.y.parse && st.b.has && st.y.has) {
+		return 0, 0, false
+	}
+
+	d := st.y.num - st.b.num
+	switch {
+	case d >= threshold:
+		return d, +1, true
+	case d <= -threshold:
+		return d, -1, true
+	default:
+		return d, 0, true
+	}
+}

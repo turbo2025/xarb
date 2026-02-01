@@ -31,6 +31,31 @@ type Config struct {
 			WsURL   string `toml:"ws_url"`
 		} `toml:"bybit"`
 	} `toml:"exchange"`
+
+	Storage struct {
+		Enabled bool `toml:"enabled"`
+
+		Redis struct {
+			Enabled       bool   `toml:"enabled"`
+			Addr          string `toml:"addr"`
+			Password      string `toml:"password"`
+			DB            int    `toml:"db"`
+			Prefix        string `toml:"prefix"`
+			TTLSeconds    int    `toml:"ttl_seconds"`
+			SignalStream  string `toml:"signal_stream"`
+			SignalChannel string `toml:"signal_channel"`
+		} `toml:"redis"`
+
+		SQLite struct {
+			Enabled bool   `toml:"enabled"`
+			Path    string `toml:"path"`
+		} `toml:"sqlite"`
+
+		Postgres struct {
+			Enabled bool   `toml:"enabled"`
+			DSN     string `toml:"dsn"`
+		} `toml:"postgres"`
+	} `toml:"storage"`
 }
 
 func Load(path string) (*Config, error) {
@@ -52,6 +77,20 @@ func applyDefaults(cfg *Config) {
 	if cfg.Arbitrage.DeltaThreshold <= 0 {
 		cfg.Arbitrage.DeltaThreshold = 5.0
 	}
+
+	// storage defaults
+	if cfg.Storage.Redis.TTLSeconds <= 0 {
+		cfg.Storage.Redis.TTLSeconds = 300
+	}
+	if strings.TrimSpace(cfg.Storage.Redis.Prefix) == "" {
+		cfg.Storage.Redis.Prefix = "xarb"
+	}
+	if strings.TrimSpace(cfg.Storage.Redis.SignalStream) == "" {
+		cfg.Storage.Redis.SignalStream = cfg.Storage.Redis.Prefix + ":signals"
+	}
+	if strings.TrimSpace(cfg.Storage.Redis.SignalChannel) == "" {
+		cfg.Storage.Redis.SignalChannel = cfg.Storage.Redis.Prefix + ":signals:pub"
+	}
 }
 
 func validate(cfg *Config) error {
@@ -65,6 +104,25 @@ func validate(cfg *Config) error {
 	}
 	if cfg.Exchange.Bybit.Enabled && strings.TrimSpace(cfg.Exchange.Bybit.WsURL) == "" {
 		return errors.New("exchange.bybit.ws_url empty but enabled")
+	}
+
+	// storage validation only if storage.enabled
+	if cfg.Storage.Enabled {
+		if cfg.Storage.Redis.Enabled {
+			if strings.TrimSpace(cfg.Storage.Redis.Addr) == "" {
+				return errors.New("storage.redis.addr empty but redis enabled")
+			}
+		}
+		if cfg.Storage.SQLite.Enabled {
+			if strings.TrimSpace(cfg.Storage.SQLite.Path) == "" {
+				return errors.New("storage.sqlite.path empty but sqlite enabled")
+			}
+		}
+		if cfg.Storage.Postgres.Enabled {
+			if strings.TrimSpace(cfg.Storage.Postgres.DSN) == "" {
+				return errors.New("storage.postgres.dsn empty but postgres enabled")
+			}
+		}
 	}
 	return nil
 }

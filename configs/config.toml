@@ -23,6 +23,8 @@ enabled = true
 addr = "127.0.0.1:6379"
 db = 0
 prefix = "xarb"
+signal_stream = "xarb:signals"
+signal_channel = "xarb:signals:pub"
 
 # [storage.postgres]
 # enabled = false
