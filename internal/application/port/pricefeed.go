@@ -1,0 +1,16 @@
+package port
+
+import "context"
+
+type Tick struct {
+	Exchange string  // "BINANCE" / "BYBIT"
+	Symbol   string  // "BTCUSDT"
+	PriceStr string  // raw string
+	PriceNum float64 // parsed float64 (best-effort)
+	Ts       int64   // unix ms
+}
+
+type PriceFeed interface {
+	Name() string
+	Subscribe(ctx context.Context, symbols []string) (<-chan Tick, error)
+}
