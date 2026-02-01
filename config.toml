@@ -1,0 +1,33 @@
+[app]
+print_every_min = 5
+
+[symbols]
+list = ["BTCUSDT", "ETHUSDT", "SUIUSDT"]
+
+[arbitrage]
+delta_threshold = 5.0
+
+[exchange.binance]
+enabled = true
+ws_url = "wss://fstream.binance.com"
+
+[exchange.bybit]
+enabled = true
+ws_url = "wss://stream.bybit.com/v5/public/linear"
+
+[storage]
+enabled = true
+
+[storage.redis]
+enabled = true
+addr = "127.0.0.1:6379"
+db = 0
+prefix = "xarb"
+
+# [storage.postgres]
+# enabled = false
+# dsn = "postgres://user:pass@127.0.0.1:5432/xarb?sslmode=disable"
+
+[storage.sqlite]
+enabled = true
+path = "./data/xarb.db"
