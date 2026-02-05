@@ -1,0 +1,36 @@
+.gitignore
+  4140c741947bdcf0 1-6,8-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.36-bit.9",
+  "base_commit_sha": "1d5ffbe2442c0c3b735d1a5678d1cc9b5b68e865",
+  "prompts": {
+    "4140c741947bdcf0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "60bc8369-b64a-455a-8e7c-e2174bf83c76",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "turbo.qiu <turbo.qiu@bybit.com>",
+      "messages": [],
+      "total_additions": 59,
+      "total_deletions": 1,
+      "accepted_lines": 54,
+      "overriden_lines": 1
+    },
+    "4f1608e248415aac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d55612b5-800d-4bba-8fad-daf958a9f32d",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "turbo.qiu <turbo.qiu@bybit.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
