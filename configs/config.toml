@@ -2,7 +2,8 @@
 print_every_min = 5
 
 [symbols]
-list = ["BTCUSDT", "ETHUSDT", "SUIUSDT"]
+#list = ["BTCUSDT", "ZECUSDT", "WLFIUSDT", "RIVERUSDT"]
+list = ["BTCUSDT", "ZECUSDT", "ASTERUSDT", "RIVERUSDT"]
 
 [arbitrage]
 delta_threshold = 5.0
