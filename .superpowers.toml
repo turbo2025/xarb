@@ -1,0 +1,145 @@
+# xarb Superpowers Configuration
+
+# 项目元数据
+[project]
+name = "xarb"
+description = "Cryptocurrency Arbitrage Bot - Real-time trading opportunity detector"
+language = "Go"
+version = "0.1.0"
+
+# 开发原则
+[principles]
+testing = "TDD - Red/Green/Refactor"
+code_quality = "80%+ test coverage"
+documentation = "Code + markdown"
+git_workflow = "git worktrees for isolation"
+
+# 规范和指南
+[standards]
+go_conventions = ".github/skills/GO_CONVENTIONS.md"
+bot_conventions = ".github/skills/BOT_CONVENTIONS.md"
+container_pattern = ".github/skills/CONTAINER_PATTERN.md"
+development = ".github/DEVELOPMENT.md"
+
+# 项目结构
+[structure.cmd]
+description = "Application entry points"
+path = "cmd/"
+
+[structure.internal.application]
+description = "Usecase layer - business orchestration"
+path = "internal/application/"
+
+[structure.internal.domain]
+description = "Domain layer - core business logic"
+path = "internal/domain/"
+
+[structure.internal.infrastructure]
+description = "Infrastructure layer - external services"
+path = "internal/infrastructure/"
+
+[structure.internal.interfaces]
+description = "Interface layer - user facing APIs"
+path = "internal/interfaces/"
+
+[structure.configs]
+description = "Application configuration"
+path = "configs/"
+
+[structure.data]
+description = "Data files and databases"
+path = "data/"
+
+# 关键命令
+[commands]
+build = "go build ./cmd/xarb"
+test = "go test -cover ./..."
+lint = "golangci-lint run"
+fmt = "gofmt -s -w ."
+verify = "go mod verify"
+
+# 测试策略
+[testing]
+framework = "Go testing + table-driven tests"
+coverage_target = 0.80
+unit_tests = "internal/**/*_test.go"
+integration_tests = "tests/**/*_test.go"
+tdd_enforced = true
+
+# 依赖管理
+[dependencies]
+redis = "github.com/redis/go-redis/v9"
+sqlite = "github.com/mattn/go-sqlite3"
+webocket = "nhooyr.io/websocket"
+logging = "github.com/rs/zerolog"
+config = "github.com/BurntSushi/toml"
+
+# Superpowers 技能触发
+[skills.brainstorming]
+trigger = "help me plan"
+output = ".github/designs/[feature].md"
+
+[skills.writing_plans]
+trigger = "write the plan"
+task_size = "2-5 minutes"
+fields = ["file_path", "code", "verify_steps"]
+
+[skills.subagent_driven_development]
+trigger = "implement"
+review_stages = 2
+stage1 = "spec compliance"
+stage2 = "code quality"
+
+[skills.test_driven_development]
+trigger = "write tests"
+cycle = ["RED", "GREEN", "REFACTOR"]
+coverage_min = 0.80
+
+[skills.systematic_debugging]
+trigger = "debug this"
+phases = 4
+method = "root-cause analysis"
+
+[skills.code_review]
+trigger = "review"
+checks = ["plan compliance", "go standards", "test coverage"]
+severity_levels = ["CRITICAL", "WARNING", "INFO"]
+
+# 项目特定规则
+[rules.redis]
+description = "Redis 实例化通过 Container"
+file = "internal/infrastructure/container/container.go"
+required = true
+
+[rules.sqlite]
+description = "SQLite 实例化通过 Container"
+file = "internal/infrastructure/container/container.go"
+required = true
+
+[rules.configuration]
+description = "配置通过 Container 注入"
+file = "internal/infrastructure/container/container.go"
+required = true
+
+[rules.dependencies]
+description = "依赖注入，禁止全局变量"
+file = "GO_CONVENTIONS.md"
+required = true
+
+[rules.tests]
+description = "所有代码都有测试"
+coverage_min = 0.80
+tdd_required = true
+
+[rules.exchanges]
+description = "新交易所遵循标准接口"
+interface = "PriceFeed"
+required_files = ["parser.go", "ws_client.go", "*_test.go"]
+
+# 验收标准
+[acceptance_criteria]
+all_tests_pass = true
+coverage_min = 0.80
+no_critical_issues = true
+documentation_updated = true
+code_review_approved = true

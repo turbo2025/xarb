@@ -6,117 +6,52 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"xarb/internal/application/usecase/monitor"
 	"xarb/internal/infrastructure/config"
+	"xarb/internal/infrastructure/container"
 	"xarb/internal/infrastructure/exchange/binance"
 	"xarb/internal/infrastructure/exchange/bybit"
 	"xarb/internal/infrastructure/logger"
-
-	// pgrepo "xarb/internal/infrastructure/storage/postgres"
-	redisrepo "xarb/internal/infrastructure/storage/redis"
-	sqliterepo "xarb/internal/infrastructure/storage/sqlite"
 	"xarb/internal/interfaces/console"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 )
 
 func main() {
 	logger.Setup()
 
+	// Parse flags
 	configPath := flag.String("config", "configs/config.toml", "path to config.toml")
 	flag.Parse()
 
+	// Load configuration
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatal().Err(err).Str("config", *configPath).Msg("load config failed")
 	}
 
+	// Initialize container with all dependencies
+	cont, err := container.New(cfg)
+	if err != nil {
+		log.Fatal().Err(err).Msg("container initialization failed")
+	}
+	defer cont.Close()
+
+	// Setup context with graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// sink (console)
+	// Initialize components
 	sink := console.NewSink()
-
-	// feeds
-	var feeds []monitor.PriceFeed
-	if cfg.Exchange.Binance.Enabled {
-		feeds = append(feeds, binance.NewFuturesMiniTickerFeed(cfg.Exchange.Binance.WsURL))
-	} else {
-		log.Warn().Msg("binance disabled by config")
-	}
-	if cfg.Exchange.Bybit.Enabled {
-		feeds = append(feeds, bybit.NewLinearTickerFeed(cfg.Exchange.Bybit.WsURL))
-	} else {
-		log.Warn().Msg("bybit disabled by config")
-	}
+	feeds := initializeFeeds(cfg)
 	if len(feeds) == 0 {
 		log.Fatal().Msg("no exchange feeds enabled")
 	}
 
-	// repositories (composite)
 	repo := monitor.NewNoopRepo()
-	var repoList []monitor.RepositoryCloser
 
-	if cfg.Storage.Enabled {
-		var repos []monitor.Repository // local alias types in monitor package below
-
-		// Redis
-		if cfg.Storage.Redis.Enabled {
-			rdb := redis.NewClient(&redis.Options{
-				Addr:     cfg.Storage.Redis.Addr,
-				Password: cfg.Storage.Redis.Password,
-				DB:       cfg.Storage.Redis.DB,
-			})
-			ttl := time.Duration(cfg.Storage.Redis.TTLSeconds) * time.Second
-			repos = append(repos, redisrepo.New(
-				rdb,
-				cfg.Storage.Redis.Prefix,
-				ttl,
-				cfg.Storage.Redis.SignalStream,
-				cfg.Storage.Redis.SignalChannel,
-			))
-			log.Info().Str("addr", cfg.Storage.Redis.Addr).Msg("redis repo enabled")
-		}
-
-		// SQLite
-		if cfg.Storage.SQLite.Enabled {
-			r, err := sqliterepo.New(cfg.Storage.SQLite.Path)
-			if err != nil {
-				log.Fatal().Err(err).Msg("sqlite repo init failed")
-			}
-			repos = append(repos, r)
-			repoList = append(repoList, r) // close on exit
-			log.Info().Str("path", cfg.Storage.SQLite.Path).Msg("sqlite repo enabled")
-		}
-
-		// Postgres
-		// if cfg.Storage.Postgres.Enabled {
-		// 	r, err := pgrepo.New(cfg.Storage.Postgres.DSN)
-		// 	if err != nil {
-		// 		log.Fatal().Err(err).Msg("postgres repo init failed")
-		// 	}
-		// 	repos = append(repos, r)
-		// 	repoList = append(repoList, r)
-		// 	log.Info().Msg("postgres repo enabled")
-		// }
-
-		// if len(repos) > 0 {
-		// 	repo = composite.New(repos...)
-		// } else {
-		// 	log.Warn().Msg("storage.enabled=true but no storage backend enabled")
-		// }
-	}
-
-	// ensure closers closed
-	defer func() {
-		for _, c := range repoList {
-			_ = c.Close()
-		}
-	}()
-
+	// Create service
 	svc := monitor.NewService(monitor.ServiceDeps{
 		Feeds:          feeds,
 		Symbols:        cfg.Symbols.List,
@@ -126,6 +61,7 @@ func main() {
 		Repo:           repo,
 	})
 
+	// Log startup info
 	log.Info().
 		Str("config", *configPath).
 		Int("symbols", len(cfg.Symbols.List)).
@@ -134,7 +70,29 @@ func main() {
 		Bool("storage_enabled", cfg.Storage.Enabled).
 		Msg("xarb started")
 
+	// Run service
 	if err := svc.Run(ctx); err != nil {
 		log.Error().Err(err).Msg("monitor service exited")
 	}
+}
+
+// initializeFeeds 初始化交易所数据源
+func initializeFeeds(cfg *config.Config) []monitor.PriceFeed {
+	var feeds []monitor.PriceFeed
+
+	if cfg.Exchange.Binance.Enabled {
+		feeds = append(feeds, binance.NewFuturesMiniTickerFeed(cfg.Exchange.Binance.WsURL))
+		log.Info().Msg("binance feed initialized")
+	} else {
+		log.Warn().Msg("binance disabled by config")
+	}
+
+	if cfg.Exchange.Bybit.Enabled {
+		feeds = append(feeds, bybit.NewLinearTickerFeed(cfg.Exchange.Bybit.WsURL))
+		log.Info().Msg("bybit feed initialized")
+	} else {
+		log.Warn().Msg("bybit disabled by config")
+	}
+
+	return feeds
 }
