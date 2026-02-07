@@ -11,10 +11,22 @@ delta_threshold = 5.0
 [exchange.binance]
 enabled = true
 ws_url = "wss://fstream.binance.com"
+balance = 500
 
 [exchange.bybit]
 enabled = true
 ws_url = "wss://stream.bybit.com/v5/public/linear"
+balance = 500
+
+[exchange.okx]
+enabled = true
+ws_url = "wss://ws.okx.com:8443/ws/v5/public"
+balance = 500
+
+[exchange.bitget]
+enabled = true
+ws_url = "wss://ws.bitget.com/spot/v1/public/stream"
+balance = 500
 
 [storage]
 enabled = true
@@ -24,6 +36,7 @@ enabled = true
 addr = "127.0.0.1:6379"
 password = "foobared"
 db = 0
+ttl_seconds = 60
 prefix = "xarb"
 signal_stream = "xarb:signals"
 signal_channel = "xarb:signals:pub"

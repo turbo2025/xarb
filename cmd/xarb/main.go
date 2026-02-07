@@ -11,7 +11,9 @@ import (
 	"xarb/internal/infrastructure/config"
 	"xarb/internal/infrastructure/container"
 	"xarb/internal/infrastructure/exchange/binance"
+	"xarb/internal/infrastructure/exchange/bitget"
 	"xarb/internal/infrastructure/exchange/bybit"
+	"xarb/internal/infrastructure/exchange/okx"
 	"xarb/internal/infrastructure/logger"
 	"xarb/internal/interfaces/console"
 
@@ -82,16 +84,30 @@ func initializeFeeds(cfg *config.Config) []monitor.PriceFeed {
 
 	if cfg.Exchange.Binance.Enabled {
 		feeds = append(feeds, binance.NewFuturesMiniTickerFeed(cfg.Exchange.Binance.WsURL))
-		log.Info().Msg("binance feed initialized")
+		log.Info().Float64("balance", cfg.Exchange.Binance.Balance).Msg("binance feed initialized")
 	} else {
 		log.Warn().Msg("binance disabled by config")
 	}
 
 	if cfg.Exchange.Bybit.Enabled {
 		feeds = append(feeds, bybit.NewLinearTickerFeed(cfg.Exchange.Bybit.WsURL))
-		log.Info().Msg("bybit feed initialized")
+		log.Info().Float64("balance", cfg.Exchange.Bybit.Balance).Msg("bybit feed initialized")
 	} else {
 		log.Warn().Msg("bybit disabled by config")
+	}
+
+	if cfg.Exchange.OKX.Enabled {
+		feeds = append(feeds, okx.NewPublicLinearTickerFeed(cfg.Exchange.OKX.WsURL))
+		log.Info().Float64("balance", cfg.Exchange.OKX.Balance).Msg("okx feed initialized")
+	} else {
+		log.Warn().Msg("okx disabled by config")
+	}
+
+	if cfg.Exchange.Bitget.Enabled {
+		feeds = append(feeds, bitget.NewPublicMarketTickerFeed(cfg.Exchange.Bitget.WsURL))
+		log.Info().Float64("balance", cfg.Exchange.Bitget.Balance).Msg("bitget feed initialized")
+	} else {
+		log.Warn().Msg("bitget disabled by config")
 	}
 
 	return feeds

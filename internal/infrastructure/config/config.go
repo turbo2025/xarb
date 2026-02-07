@@ -22,14 +22,28 @@ type Config struct {
 
 	Exchange struct {
 		Binance struct {
-			Enabled bool   `toml:"enabled"`
-			WsURL   string `toml:"ws_url"`
+			Enabled bool    `toml:"enabled"`
+			WsURL   string  `toml:"ws_url"`
+			Balance float64 `toml:"balance"`
 		} `toml:"binance"`
 
 		Bybit struct {
-			Enabled bool   `toml:"enabled"`
-			WsURL   string `toml:"ws_url"`
+			Enabled bool    `toml:"enabled"`
+			WsURL   string  `toml:"ws_url"`
+			Balance float64 `toml:"balance"`
 		} `toml:"bybit"`
+
+		OKX struct {
+			Enabled bool    `toml:"enabled"`
+			WsURL   string  `toml:"ws_url"`
+			Balance float64 `toml:"balance"`
+		} `toml:"okx"`
+
+		Bitget struct {
+			Enabled bool    `toml:"enabled"`
+			WsURL   string  `toml:"ws_url"`
+			Balance float64 `toml:"balance"`
+		} `toml:"bitget"`
 	} `toml:"exchange"`
 
 	Storage struct {
@@ -105,6 +119,12 @@ func validate(cfg *Config) error {
 	if cfg.Exchange.Bybit.Enabled && strings.TrimSpace(cfg.Exchange.Bybit.WsURL) == "" {
 		return errors.New("exchange.bybit.ws_url empty but enabled")
 	}
+	if cfg.Exchange.OKX.Enabled && strings.TrimSpace(cfg.Exchange.OKX.WsURL) == "" {
+		return errors.New("exchange.okx.ws_url empty but enabled")
+	}
+	if cfg.Exchange.Bitget.Enabled && strings.TrimSpace(cfg.Exchange.Bitget.WsURL) == "" {
+		return errors.New("exchange.bitget.ws_url empty but enabled")
+	}
 
 	// storage validation only if storage.enabled
 	if cfg.Storage.Enabled {
@@ -142,4 +162,33 @@ func normalizeSymbols(in []string) []string {
 		out = append(out, u)
 	}
 	return out
+}
+
+// Exported types for programmatic configuration
+type StorageConfig struct {
+	Enabled  bool
+	SQLite   SQLiteConfig
+	Redis    RedisConfig
+	Postgres PostgresConfig
+}
+
+type SQLiteConfig struct {
+	Enabled bool
+	Path    string
+}
+
+type RedisConfig struct {
+	Enabled       bool
+	Addr          string
+	Password      string
+	DB            int
+	Prefix        string
+	TTLSeconds    int
+	SignalStream  string
+	SignalChannel string
+}
+
+type PostgresConfig struct {
+	Enabled bool
+	DSN     string
 }
