@@ -26,8 +26,7 @@ type pxState struct {
 }
 
 type symState struct {
-	b pxState
-	y pxState
+	exchanges map[string]*pxState // exchange -> price state (e.g., "BINANCE" -> *pxState)
 }
 
 type State struct {
@@ -46,7 +45,9 @@ func NewState(symbols []string) *State {
 			continue
 		}
 		order = append(order, u)
-		syms[u] = &symState{}
+		syms[u] = &symState{
+			exchanges: make(map[string]*pxState),
+		}
 	}
 	return &State{order: order, syms: syms}
 }
@@ -60,7 +61,7 @@ func (s *State) Apply(t port.Tick) bool {
 	ex := strings.ToUpper(strings.TrimSpace(t.Exchange))
 	sym := strings.ToUpper(strings.TrimSpace(t.Symbol))
 	price := strings.TrimSpace(t.PriceStr)
-	if sym == "" || price == "" {
+	if sym == "" || price == "" || ex == "" {
 		return false
 	}
 
@@ -72,16 +73,14 @@ func (s *State) Apply(t port.Tick) bool {
 		return false
 	}
 
-	var ps *pxState
-	switch ex {
-	case "BINANCE":
-		ps = &st.b
-	case "BYBIT":
-		ps = &st.y
-	default:
-		return false
+	// 获取或创建该交易所的价格状态
+	ps := st.exchanges[ex]
+	if ps == nil {
+		ps = &pxState{}
+		st.exchanges[ex] = ps
 	}
 
+	// 检查价格是否变化
 	if ps.str == price {
 		ps.seen = true
 		return false
@@ -129,6 +128,45 @@ func (s *State) Snapshot() map[string]symState {
 	return out
 }
 
+// DeltaBandFor 计算两个特定交易所间的价差和带状分级
+func (s *State) DeltaBandFor(symbol string, ex1, ex2 string, threshold float64) (delta float64, band int, ok bool) {
+	sym := strings.ToUpper(strings.TrimSpace(symbol))
+	e1 := strings.ToUpper(strings.TrimSpace(ex1))
+	e2 := strings.ToUpper(strings.TrimSpace(ex2))
+
+	if sym == "" || e1 == "" || e2 == "" || threshold <= 0 {
+		return 0, 0, false
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	st := s.syms[sym]
+	if st == nil {
+		return 0, 0, false
+	}
+
+	// 获取两个交易所的价格状态
+	ps1 := st.exchanges[e1]
+	ps2 := st.exchanges[e2]
+
+	// 两边都必须 parse & has 才能算 delta
+	if ps1 == nil || ps2 == nil || !(ps1.parse && ps2.parse && ps1.has && ps2.has) {
+		return 0, 0, false
+	}
+
+	d := ps2.num - ps1.num
+	switch {
+	case d >= threshold:
+		return d, +1, true
+	case d <= -threshold:
+		return d, -1, true
+	default:
+		return d, 0, true
+	}
+}
+
+// DeltaBand 对所有交易所对进行两两比较，返回最大和最小的 delta（已弃用，建议使用 DeltaBandFor）
 func (s *State) DeltaBand(symbol string, threshold float64) (delta float64, band int, ok bool) {
 	sym := strings.ToUpper(strings.TrimSpace(symbol))
 	if sym == "" || threshold <= 0 {
@@ -143,12 +181,29 @@ func (s *State) DeltaBand(symbol string, threshold float64) (delta float64, band
 		return 0, 0, false
 	}
 
-	// 只有两边都 parse & has 才能算 delta
-	if !(st.b.parse && st.y.parse && st.b.has && st.y.has) {
+	if len(st.exchanges) < 2 {
 		return 0, 0, false
 	}
 
-	d := st.y.num - st.b.num
+	// 获取所有交易所（按字母序，确保一致性）
+	var exchanges []string
+	for ex := range st.exchanges {
+		exchanges = append(exchanges, ex)
+	}
+	if len(exchanges) < 2 {
+		return 0, 0, false
+	}
+
+	// 简化版本：使用前两个交易所（按字母序）
+	// 更好的做法是在 Service 层配置要比较的交易所
+	ps1 := st.exchanges[exchanges[0]]
+	ps2 := st.exchanges[exchanges[1]]
+
+	if ps1 == nil || ps2 == nil || !(ps1.parse && ps2.parse && ps1.has && ps2.has) {
+		return 0, 0, false
+	}
+
+	d := ps2.num - ps1.num
 	switch {
 	case d >= threshold:
 		return d, +1, true
@@ -157,4 +212,37 @@ func (s *State) DeltaBand(symbol string, threshold float64) (delta float64, band
 	default:
 		return d, 0, true
 	}
+}
+
+// GetExchangePrices 获取某个交易对的所有交易所价格（用于两两比较）
+func (s *State) GetExchangePrices(symbol string) map[string]*pxState {
+	sym := strings.ToUpper(strings.TrimSpace(symbol))
+	if sym == "" {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	st := s.syms[sym]
+	if st == nil {
+		return nil
+	}
+
+	// 返回副本，避免外部修改
+	out := make(map[string]*pxState, len(st.exchanges))
+	for ex, ps := range st.exchanges {
+		out[ex] = ps
+	}
+	return out
+}
+
+// GetExchangeNames 获取某个交易对下所有有效交易所的名称列表
+func (s *State) GetExchangeNames(symbol string) []string {
+	prices := s.GetExchangePrices(symbol)
+	var names []string
+	for ex := range prices {
+		names = append(names, ex)
+	}
+	return names
 }

@@ -3,7 +3,7 @@ package port
 import "context"
 
 type Tick struct {
-	Exchange string  // "BINANCE" / "BYBIT"
+	Exchange string  // 交易所 "BINANCE" "BYBIT"
 	Symbol   string  // "BTCUSDT"
 	PriceStr string  // raw string
 	PriceNum float64 // parsed float64 (best-effort)

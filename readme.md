@@ -2,6 +2,25 @@
 
 Real-time arbitrage opportunity detector for cryptocurrency trading across multiple exchanges.
 
+## Documentation Index
+
+All in-depth documentation now lives under the [`docs/`](docs) directory. Start here:
+
+**🎯 架构设计 (DDD + Go-Zero 融合)**
+- **[Architecture Summary](docs/ARCHITECTURE_SUMMARY.md)** ⭐⭐⭐ 一页纸总结所有内容
+- **[Architecture Quick Reference](docs/ARCHITECTURE_QUICK_REFERENCE.md)** ⭐⭐ 快速参考（5分钟）
+- **[DDD & Go-Zero Best Practices](docs/DDD_GOZEERO_BEST_PRACTICES.md)** ⭐⭐ 最佳实践指南
+- **[DDD Architecture Analysis](docs/DDD_ARCHITECTURE_ANALYSIS.md)** ⭐ 深入分析
+- **[Architecture Decision Record](docs/ARCHITECTURE_DECISION_RECORD.md)** ⭐ 决策背景
+
+**📚 功能文档**
+- [Project Summary](docs/PROJECT_SUMMARY.md)
+- [Arbitrage System Guide](docs/ARBITRAGE.md)
+- [Architecture Deep Dive](docs/ARCHITECTURE.md)
+- [Quick Start](docs/QUICKSTART.md)
+- [Change Log](docs/CHANGELOG.md)
+- [Completion Checklist](docs/COMPLETION_CHECKLIST.md)
+
 ## Features
 
 - 🔄 **Multi-Exchange Support**: Binance, Bybit, and extensible to more
@@ -29,7 +48,7 @@ Real-time arbitrage opportunity detector for cryptocurrency trading across multi
 └─────────────────────────────────────┘
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture.
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture.
 
 ## Quick Start
 
@@ -267,7 +286,7 @@ MIT License - see LICENSE file for details
 
 - 📖 [Development Guide](.github/DEVELOPMENT.md)
 - 🚀 [Superpowers Setup](.github/SUPERPOWERS.md)
-- 📋 [Architecture](.ARCHITECTURE.md)
+- 📋 [Architecture](docs/ARCHITECTURE.md)
 - 💬 [Issues](https://github.com/yourusername/xarb/issues)
 
 ## Acknowledgments

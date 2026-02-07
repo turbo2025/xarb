@@ -2,36 +2,76 @@
 print_every_min = 5
 
 [symbols]
-#list = ["BTCUSDT", "ZECUSDT", "WLFIUSDT", "RIVERUSDT"]
-list = ["BTCUSDT", "ZECUSDT", "ASTERUSDT", "RIVERUSDT"]
+list = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+# list = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "ZECUSDT", "AAVEUSDT"]
 
 [arbitrage]
 delta_threshold = 5.0
 
-[exchange.binance]
-enabled = true
-ws_url = "wss://fstream.binance.com"
+# [monitor] 部分用于配置监控设置
+# exchanges: 要监控的交易所列表，用于两两比较跨交易所的套利机会
+# 如果留空，将自动监控所有启用的交易所
+# 注意：只有enabled=true的交易所才会被实际监控
+[monitor]
+# 例如在binance/bybit/okx之间监控套利机会
+# exchanges = ["binance", "bybit", "okx"]
+# 如果留空，则自动使用所有enabled的交易所
+exchanges = []
 
-[exchange.bybit]
-enabled = true
-ws_url = "wss://stream.bybit.com/v5/public/linear"
+[exchanges.binance]
+enabled = false
+api_key = "GODOZ5H4IQVahtXu216X5kdQBTbYT4tNf5LydQWuxexlMJZrw0xbQvrL1BP1PunN"
+secret_key = "j14JDmShOc6SUppf6Uz4vhnQwsbUGK6f2NzfTV4hGcnkwCJaXq8OtNbZUx5gLINU"
+spot_http_url = "https://api.binance.com"
+spot_ws_url = "wss://stream.binance.com:443/ws"
+perpetual_http_url = "https://fapi.binance.com"
+perpetual_ws_url = "wss://fstream.binance.com/ws"
 
-[storage]
+[exchanges.bybit]
 enabled = true
+api_key = "ovxG4pT6BFE8Oh7b7E"
+secret_key = "gPfgyDrfR4WswFdPgVpXsbnSEQeaCcX30Lsu"
+spot_http_url = "https://api.bybit.com"
+spot_ws_url = "wss://stream.bybit.com/v5/public/spot"
+perpetual_http_url = "https://api.bybit.com"
+perpetual_ws_url = "wss://stream.bybit.com/v5/public/linear"
 
-[storage.redis]
+[exchanges.okx]
+enabled = true
+api_key = "dc6a2205-830f-4952-9acd-81d5b9ea2470"
+secret_key = "6218E25764E121957B36D854B4776FEC"
+passphrase = "Trade123@"
+spot_http_url = "https://www.okx.com"
+spot_ws_url = ""
+perpetual_http_url = "https://www.okx.com"
+perpetual_ws_url = "wss://ws.okx.com:8443/ws/v5/public"
+
+
+[exchanges.bitget]
+enabled = false
+api_key = "bg_6fe0bc583114ca91cb35c4c5a33b1c3d"
+secret_key = "50ec0bdaaa0d43e301fdf286029da7029b5d33dedd412d60e408c88624484710"
+passphrase = "Box2024btc"
+spot_http_url = "https://api.bitget.com"
+spot_ws_url = "wss://ws.bitget.com/v2/ws/public"                                # public channel
+# wss://ws.bitget.com/v2/ws/private # private channel
+perpetual_http_url = "https://api.bitget.com"
+perpetual_ws_url = ""
+
+[redis]
 enabled = true
 addr = "127.0.0.1:6379"
 password = "foobared"
 db = 0
+ttl_seconds = 60
 prefix = "xarb"
 signal_stream = "xarb:signals"
 signal_channel = "xarb:signals:pub"
 
-# [storage.postgres]
+# [postgres]
 # enabled = false
 # dsn = "postgres://user:pass@127.0.0.1:5432/xarb?sslmode=disable"
 
-[storage.sqlite]
+[sqlite]
 enabled = true
 path = "./data/xarb.db"

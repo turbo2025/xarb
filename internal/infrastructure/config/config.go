@@ -2,10 +2,24 @@ package config
 
 import (
 	"errors"
+	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 )
+
+// ExchangeConfig 交易所配置（通用格式）
+type ExchangeConfig struct {
+	Enabled          bool   `toml:"enabled"`
+	APIKey           string `toml:"api_key"`
+	SecretKey        string `toml:"secret_key"`
+	Passphrase       string `toml:"passphrase"` // 仅 OKX、Bitget 需要
+	SpotHttpURL      string `toml:"spot_http_url"`
+	SpotWsURL        string `toml:"spot_ws_url"`
+	PerpetualHttpURL string `toml:"perpetual_http_url"`
+	PerpetualWsURL   string `toml:"perpetual_ws_url"`
+}
 
 type Config struct {
 	App struct {
@@ -20,42 +34,32 @@ type Config struct {
 		DeltaThreshold float64 `toml:"delta_threshold"`
 	} `toml:"arbitrage"`
 
-	Exchange struct {
-		Binance struct {
-			Enabled bool   `toml:"enabled"`
-			WsURL   string `toml:"ws_url"`
-		} `toml:"binance"`
+	Monitor struct {
+		Exchanges []string `toml:"exchanges"` // 要监控的交易所列表（可选，如果为空则监控所有enabled的）
+	} `toml:"monitor"`
 
-		Bybit struct {
-			Enabled bool   `toml:"enabled"`
-			WsURL   string `toml:"ws_url"`
-		} `toml:"bybit"`
-	} `toml:"exchange"`
+	Exchanges map[string]ExchangeConfig `toml:"exchanges"`
 
-	Storage struct {
-		Enabled bool `toml:"enabled"`
+	Redis struct {
+		Enabled       bool   `toml:"enabled"`
+		Addr          string `toml:"addr"`
+		Password      string `toml:"password"`
+		DB            int    `toml:"db"`
+		Prefix        string `toml:"prefix"`
+		TTLSeconds    int    `toml:"ttl_seconds"`
+		SignalStream  string `toml:"signal_stream"`
+		SignalChannel string `toml:"signal_channel"`
+	} `toml:"redis"`
 
-		Redis struct {
-			Enabled       bool   `toml:"enabled"`
-			Addr          string `toml:"addr"`
-			Password      string `toml:"password"`
-			DB            int    `toml:"db"`
-			Prefix        string `toml:"prefix"`
-			TTLSeconds    int    `toml:"ttl_seconds"`
-			SignalStream  string `toml:"signal_stream"`
-			SignalChannel string `toml:"signal_channel"`
-		} `toml:"redis"`
+	SQLite struct {
+		Enabled bool   `toml:"enabled"`
+		Path    string `toml:"path"`
+	} `toml:"sqlite"`
 
-		SQLite struct {
-			Enabled bool   `toml:"enabled"`
-			Path    string `toml:"path"`
-		} `toml:"sqlite"`
-
-		Postgres struct {
-			Enabled bool   `toml:"enabled"`
-			DSN     string `toml:"dsn"`
-		} `toml:"postgres"`
-	} `toml:"storage"`
+	Postgres struct {
+		Enabled bool   `toml:"enabled"`
+		DSN     string `toml:"dsn"`
+	} `toml:"postgres"`
 }
 
 func Load(path string) (*Config, error) {
@@ -79,17 +83,17 @@ func applyDefaults(cfg *Config) {
 	}
 
 	// storage defaults
-	if cfg.Storage.Redis.TTLSeconds <= 0 {
-		cfg.Storage.Redis.TTLSeconds = 300
+	if cfg.Redis.TTLSeconds <= 0 {
+		cfg.Redis.TTLSeconds = 300
 	}
-	if strings.TrimSpace(cfg.Storage.Redis.Prefix) == "" {
-		cfg.Storage.Redis.Prefix = "xarb"
+	if strings.TrimSpace(cfg.Redis.Prefix) == "" {
+		cfg.Redis.Prefix = "xarb"
 	}
-	if strings.TrimSpace(cfg.Storage.Redis.SignalStream) == "" {
-		cfg.Storage.Redis.SignalStream = cfg.Storage.Redis.Prefix + ":signals"
+	if strings.TrimSpace(cfg.Redis.SignalStream) == "" {
+		cfg.Redis.SignalStream = cfg.Redis.Prefix + ":signals"
 	}
-	if strings.TrimSpace(cfg.Storage.Redis.SignalChannel) == "" {
-		cfg.Storage.Redis.SignalChannel = cfg.Storage.Redis.Prefix + ":signals:pub"
+	if strings.TrimSpace(cfg.Redis.SignalChannel) == "" {
+		cfg.Redis.SignalChannel = cfg.Redis.Prefix + ":signals:pub"
 	}
 }
 
@@ -99,29 +103,29 @@ func validate(cfg *Config) error {
 		return errors.New("symbols.list is empty")
 	}
 
-	if cfg.Exchange.Binance.Enabled && strings.TrimSpace(cfg.Exchange.Binance.WsURL) == "" {
-		return errors.New("exchange.binance.ws_url empty but enabled")
-	}
-	if cfg.Exchange.Bybit.Enabled && strings.TrimSpace(cfg.Exchange.Bybit.WsURL) == "" {
-		return errors.New("exchange.bybit.ws_url empty but enabled")
+	// 验证所有启用的交易所都有必要的配置
+	for exchangeName, exchCfg := range cfg.Exchanges {
+		if !exchCfg.Enabled {
+			continue
+		}
+		if strings.TrimSpace(exchCfg.PerpetualWsURL) == "" {
+			return fmt.Errorf("exchange.%s.perpetual_ws_url empty but enabled", exchangeName)
+		}
 	}
 
-	// storage validation only if storage.enabled
-	if cfg.Storage.Enabled {
-		if cfg.Storage.Redis.Enabled {
-			if strings.TrimSpace(cfg.Storage.Redis.Addr) == "" {
-				return errors.New("storage.redis.addr empty but redis enabled")
-			}
+	if cfg.Redis.Enabled {
+		if strings.TrimSpace(cfg.Redis.Addr) == "" {
+			return errors.New("redis.addr empty but redis enabled")
 		}
-		if cfg.Storage.SQLite.Enabled {
-			if strings.TrimSpace(cfg.Storage.SQLite.Path) == "" {
-				return errors.New("storage.sqlite.path empty but sqlite enabled")
-			}
+	}
+	if cfg.SQLite.Enabled {
+		if strings.TrimSpace(cfg.SQLite.Path) == "" {
+			return errors.New("sqlite.path empty but sqlite enabled")
 		}
-		if cfg.Storage.Postgres.Enabled {
-			if strings.TrimSpace(cfg.Storage.Postgres.DSN) == "" {
-				return errors.New("storage.postgres.dsn empty but postgres enabled")
-			}
+	}
+	if cfg.Postgres.Enabled {
+		if strings.TrimSpace(cfg.Postgres.DSN) == "" {
+			return errors.New("postgres.dsn empty but postgres enabled")
 		}
 	}
 	return nil
@@ -142,4 +146,62 @@ func normalizeSymbols(in []string) []string {
 		out = append(out, u)
 	}
 	return out
+}
+
+// Exported types for programmatic configuration
+type StorageConfig struct {
+	Enabled  bool
+	SQLite   SQLiteConfig
+	Redis    RedisConfig
+	Postgres PostgresConfig
+}
+
+type SQLiteConfig struct {
+	Enabled bool
+	Path    string
+}
+
+type RedisConfig struct {
+	Enabled       bool
+	Addr          string
+	Password      string
+	DB            int
+	Prefix        string
+	TTLSeconds    int
+	SignalStream  string
+	SignalChannel string
+}
+
+type PostgresConfig struct {
+	Enabled bool
+	DSN     string
+}
+
+// GetEnabledExchanges 获取所有enabled的交易所名称列表
+// 如果Monitor.Exchanges已配置，则使用该列表中enabled的交易所
+// 否则，返回所有enabled的交易所，按字母顺序排列
+func (c *Config) GetEnabledExchanges() []string {
+	var enabledExchanges []string
+
+	// 如果Monitor中配置了特定的交易所，检查这些交易所是否启用
+	if len(c.Monitor.Exchanges) > 0 {
+		for _, exName := range c.Monitor.Exchanges {
+			if cfg, ok := c.Exchanges[exName]; ok && cfg.Enabled {
+				enabledExchanges = append(enabledExchanges, exName)
+			}
+		}
+		return enabledExchanges
+	}
+
+	// 否则，返回所有enabled的交易所
+	// 为保证顺序一致，我们需要按字母顺序返回
+	var allExchanges []string
+	for name, cfg := range c.Exchanges {
+		if cfg.Enabled {
+			allExchanges = append(allExchanges, name)
+		}
+	}
+	// 排序确保顺序一致
+	sort.Strings(allExchanges)
+	return allExchanges
 }

@@ -15,15 +15,15 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type LinearTickerFeed struct {
+type PerpetualTickerFeed struct {
 	wsURL string // e.g. wss://stream.bybit.com/v5/public/linear
 }
 
-func NewLinearTickerFeed(wsURL string) *LinearTickerFeed {
-	return &LinearTickerFeed{wsURL: strings.TrimSpace(wsURL)}
+func NewPerpetualTickerFeed(wsURL string) *PerpetualTickerFeed {
+	return &PerpetualTickerFeed{wsURL: strings.TrimSpace(wsURL)}
 }
 
-func (f *LinearTickerFeed) Name() string { return "BYBIT" }
+func (f *PerpetualTickerFeed) Name() string { return "BYBIT" }
 
 type bybitSubReq struct {
 	Op   string   `json:"op"`
@@ -86,7 +86,7 @@ type bybitTickerMsg struct {
 	Op      string `json:"op,omitempty"`
 }
 
-func (f *LinearTickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
+func (f *PerpetualTickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
 	if f.wsURL == "" {
 		return nil, errors.New("bybit ws_url empty")
 	}
@@ -112,7 +112,7 @@ func buildTopics(symbols []string) []string {
 	return out
 }
 
-func (f *LinearTickerFeed) run(ctx context.Context, topics []string, out chan<- port.Tick) {
+func (f *PerpetualTickerFeed) run(ctx context.Context, topics []string, out chan<- port.Tick) {
 	defer close(out)
 
 	backoff := 500 * time.Millisecond
@@ -176,7 +176,7 @@ func (f *LinearTickerFeed) run(ctx context.Context, topics []string, out chan<- 
 				}
 				pxn, _ := strconv.ParseFloat(pxs, 64)
 				out <- port.Tick{
-					Exchange: "BYBIT",
+					Exchange: f.Name(),
 					Symbol:   sym,
 					PriceStr: pxs,
 					PriceNum: pxn,
@@ -212,6 +212,9 @@ func readLoop(ctx context.Context, conn *websocket.Conn, onMsg func([]byte)) err
 		defer close(errCh)
 		for {
 			_, b, err := conn.ReadMessage()
+			if err == nil {
+				_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			}
 			if err != nil {
 				errCh <- err
 				return

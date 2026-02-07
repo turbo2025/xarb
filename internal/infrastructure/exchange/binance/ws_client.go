@@ -16,15 +16,15 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type FuturesMiniTickerFeed struct {
+type PerpetualTickerFeed struct {
 	wsBase string // e.g. wss://fstream.binance.com
 }
 
-func NewFuturesMiniTickerFeed(wsBase string) *FuturesMiniTickerFeed {
-	return &FuturesMiniTickerFeed{wsBase: strings.TrimRight(strings.TrimSpace(wsBase), "/")}
+func NewPerpetualTickerFeed(wsBase string) *PerpetualTickerFeed {
+	return &PerpetualTickerFeed{wsBase: strings.TrimRight(strings.TrimSpace(wsBase), "/")}
 }
 
-func (f *FuturesMiniTickerFeed) Name() string { return "BINANCE" }
+func (f *PerpetualTickerFeed) Name() string { return "BINANCE" }
 
 type binanceCombined struct {
 	Stream string         `json:"stream"`
@@ -35,7 +35,7 @@ type binanceMiniMsg struct {
 	Close  string `json:"c"`
 }
 
-func (f *FuturesMiniTickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
+func (f *PerpetualTickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
 	wsURL, err := buildCombinedURL(f.wsBase, symbols)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func buildCombinedURL(base string, symbols []string) (string, error) {
 	return u.String(), nil
 }
 
-func (f *FuturesMiniTickerFeed) run(ctx context.Context, wsURL string, out chan<- port.Tick) {
+func (f *PerpetualTickerFeed) run(ctx context.Context, wsURL string, out chan<- port.Tick) {
 	defer close(out)
 
 	backoff := 500 * time.Millisecond
@@ -115,7 +115,7 @@ func (f *FuturesMiniTickerFeed) run(ctx context.Context, wsURL string, out chan<
 			}
 			pxn, _ := strconv.ParseFloat(pxs, 64)
 			out <- port.Tick{
-				Exchange: "BINANCE",
+				Exchange: f.Name(),
 				Symbol:   sym,
 				PriceStr: pxs,
 				PriceNum: pxn,
@@ -150,6 +150,9 @@ func readLoop(ctx context.Context, conn *websocket.Conn, onMsg func([]byte)) err
 		defer close(errCh)
 		for {
 			_, b, err := conn.ReadMessage()
+			if err == nil {
+				_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			}
 			if err != nil {
 				errCh <- err
 				return

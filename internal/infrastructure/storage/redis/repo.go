@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"xarb/internal/application/port"
@@ -13,80 +12,94 @@ import (
 )
 
 type Repo struct {
-	rdb          *redis.Client
-	prefix       string
-	ttl          time.Duration
-	keyLatest    string // prefix + ":latest"
-	signalStream string
-	signalChan   string
+	client        *redis.Client
+	prefix        string
+	ttl           time.Duration
+	signalStream  string
+	signalChannel string
 }
 
-type LatestPrice struct {
-	Exchange string  `json:"exchange"`
-	Symbol   string  `json:"symbol"`
-	Price    float64 `json:"price"`
-	Ts       int64   `json:"ts"`
-}
-
-func New(rdb *redis.Client, prefix string, ttl time.Duration, signalStream, signalChan string) *Repo {
-	if strings.TrimSpace(signalStream) == "" {
-		signalStream = prefix + ":signals"
-	}
-	if strings.TrimSpace(signalChan) == "" {
-		signalChan = prefix + ":signals:pub"
-	}
+func New(client *redis.Client, prefix string, ttl time.Duration, signalStream, signalChannel string) *Repo {
 	return &Repo{
-		rdb:          rdb,
-		prefix:       prefix,
-		ttl:          ttl,
-		keyLatest:    prefix + ":latest",
-		signalStream: signalStream,
-		signalChan:   signalChan,
+		client:        client,
+		prefix:        prefix,
+		ttl:           ttl,
+		signalStream:  signalStream,
+		signalChannel: signalChannel,
 	}
+}
+
+func (r *Repo) key(parts ...string) string {
+	fullKey := r.prefix
+	for _, part := range parts {
+		fullKey += ":" + part
+	}
+	return fullKey
+}
+
+func (r *Repo) Close() error {
+	return r.client.Close()
 }
 
 func (r *Repo) UpsertLatestPrice(ctx context.Context, ex, symbol string, price float64, ts int64) error {
-	if price <= 0 {
-		return nil
-	}
-	lp := LatestPrice{Exchange: ex, Symbol: symbol, Price: price, Ts: ts}
-	b, _ := json.Marshal(lp)
+	key := r.key("price", ex, symbol)
+	data := map[string]interface{}{"price": price, "ts_ms": ts}
+	b, _ := json.Marshal(data)
+	return r.client.Set(ctx, key, b, r.ttl).Err()
+}
 
-	// Hash: field = "BINANCE:BTCUSDT" -> json
-	field := fmt.Sprintf("%s:%s", ex, symbol)
-	pipe := r.rdb.Pipeline()
-	pipe.HSet(ctx, r.keyLatest, field, string(b))
-	if r.ttl > 0 {
-		pipe.Expire(ctx, r.keyLatest, r.ttl)
+func (r *Repo) UpsertPosition(ctx context.Context, ex, symbol string, quantity, entryPrice float64, ts int64) error {
+	key := r.key("position", ex, symbol)
+	data := map[string]interface{}{"quantity": quantity, "entryPrice": entryPrice, "ts_ms": ts}
+	b, _ := json.Marshal(data)
+	return r.client.Set(ctx, key, b, r.ttl).Err()
+}
+
+func (r *Repo) GetPosition(ctx context.Context, ex, symbol string) (float64, float64, error) {
+	key := r.key("position", ex, symbol)
+	val, err := r.client.Get(ctx, key).Result()
+	if err != nil {
+		return 0, 0, err
 	}
-	_, err := pipe.Exec(ctx)
-	return err
+	var data map[string]float64
+	if err := json.Unmarshal([]byte(val), &data); err != nil {
+		return 0, 0, err
+	}
+	return data["quantity"], data["entryPrice"], nil
+}
+
+func (r *Repo) ListPositions(ctx context.Context) ([]map[string]interface{}, error) {
+	pattern := r.key("position", "*", "*")
+	keys, err := r.client.Keys(ctx, pattern).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var positions []map[string]interface{}
+	for _, key := range keys {
+		val, err := r.client.Get(ctx, key).Result()
+		if err != nil {
+			continue
+		}
+		var data map[string]interface{}
+		if err := json.Unmarshal([]byte(val), &data); err != nil {
+			continue
+		}
+		positions = append(positions, data)
+	}
+	return positions, nil
 }
 
 func (r *Repo) InsertSnapshot(ctx context.Context, ts int64, payload string) error {
-	// optional: store snapshots in Redis stream / list later
-	return nil
+	key := r.key("snapshot", fmt.Sprintf("%d", ts))
+	return r.client.Set(ctx, key, payload, r.ttl).Err()
 }
 
 func (r *Repo) InsertSignal(ctx context.Context, ts int64, symbol string, delta float64, payload string) error {
-	// 1) Stream: XADD <stream> * ts symbol delta payload
-	_, err := r.rdb.XAdd(ctx, &redis.XAddArgs{
-		Stream: r.signalStream,
-		Values: map[string]any{
-			"ts_ms":   ts,
-			"symbol":  symbol,
-			"delta":   delta,
-			"payload": payload,
-		},
-	}).Result()
-	if err != nil {
-		return err
-	}
-
-	// 2) PubSub: PUBLISH <channel> json
-	// 用最简单的 JSON，便于消费者
-	msg := fmt.Sprintf(`{"ts_ms":%d,"symbol":"%s","delta":%.8f,"payload":%q}`, ts, symbol, delta, payload)
-	return r.rdb.Publish(ctx, r.signalChan, msg).Err()
+	key := r.key("signal", symbol, fmt.Sprintf("%d", ts))
+	data := map[string]interface{}{"delta": delta, "payload": payload}
+	b, _ := json.Marshal(data)
+	return r.client.Set(ctx, key, b, r.ttl).Err()
 }
 
 var _ port.Repository = (*Repo)(nil)
