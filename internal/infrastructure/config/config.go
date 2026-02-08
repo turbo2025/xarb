@@ -22,27 +22,41 @@ type Config struct {
 
 	Exchange struct {
 		Binance struct {
-			Enabled bool    `toml:"enabled"`
-			WsURL   string  `toml:"ws_url"`
-			Balance float64 `toml:"balance"`
+			Enabled    bool   `toml:"enabled"`
+			APIKey     string `toml:"api_key"`
+			SecretKey  string `toml:"secret_key"`
+			FuturesURL string `toml:"futures_url"`
+			SpotURL    string `toml:"spot_url"`
+			WsURL      string `toml:"ws_url"`
 		} `toml:"binance"`
 
 		Bybit struct {
-			Enabled bool    `toml:"enabled"`
-			WsURL   string  `toml:"ws_url"`
-			Balance float64 `toml:"balance"`
+			Enabled   bool   `toml:"enabled"`
+			APIKey    string `toml:"api_key"`
+			SecretKey string `toml:"secret_key"`
+			LinearURL string `toml:"linear_url"`
+			SpotURL   string `toml:"spot_url"`
+			WsURL     string `toml:"ws_url"`
 		} `toml:"bybit"`
 
 		OKX struct {
-			Enabled bool    `toml:"enabled"`
-			WsURL   string  `toml:"ws_url"`
-			Balance float64 `toml:"balance"`
+			Enabled    bool   `toml:"enabled"`
+			APIKey     string `toml:"api_key"`
+			SecretKey  string `toml:"secret_key"`
+			Passphrase string `toml:"passphrase"`
+			FuturesURL string `toml:"futures_url"`
+			SpotURL    string `toml:"spot_url"`
+			WsURL      string `toml:"ws_url"`
 		} `toml:"okx"`
 
 		Bitget struct {
-			Enabled bool    `toml:"enabled"`
-			WsURL   string  `toml:"ws_url"`
-			Balance float64 `toml:"balance"`
+			Enabled    bool   `toml:"enabled"`
+			APIKey     string `toml:"api_key"`
+			SecretKey  string `toml:"secret_key"`
+			Passphrase string `toml:"passphrase"`
+			FuturesURL string `toml:"futures_url"`
+			SpotURL    string `toml:"spot_url"`
+			WsURL      string `toml:"ws_url"`
 		} `toml:"bitget"`
 	} `toml:"exchange"`
 

@@ -176,7 +176,7 @@ func (f *LinearTickerFeed) run(ctx context.Context, topics []string, out chan<- 
 				}
 				pxn, _ := strconv.ParseFloat(pxs, 64)
 				out <- port.Tick{
-					Exchange: "BYBIT",
+					Exchange: f.Name(),
 					Symbol:   sym,
 					PriceStr: pxs,
 					PriceNum: pxn,

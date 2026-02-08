@@ -115,7 +115,7 @@ func (f *FuturesMiniTickerFeed) run(ctx context.Context, wsURL string, out chan<
 			}
 			pxn, _ := strconv.ParseFloat(pxs, 64)
 			out <- port.Tick{
-				Exchange: "BINANCE",
+				Exchange: f.Name(),
 				Symbol:   sym,
 				PriceStr: pxs,
 				PriceNum: pxn,

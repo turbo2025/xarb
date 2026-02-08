@@ -139,7 +139,7 @@ func (f *PublicLinearTickerFeed) run(ctx context.Context, symbols []string, out 
 				}
 
 				out <- port.Tick{
-					Exchange: "OKX",
+					Exchange: f.Name(),
 					Symbol:   sym,
 					PriceStr: pxs,
 					PriceNum: pxn,

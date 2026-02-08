@@ -141,7 +141,7 @@ func (f *PublicMarketTickerFeed) run(ctx context.Context, symbols []string, out 
 				}
 
 				out <- port.Tick{
-					Exchange: "BITGET",
+					Exchange: f.Name(),
 					Symbol:   sym,
 					PriceStr: pxs,
 					PriceNum: pxn,
