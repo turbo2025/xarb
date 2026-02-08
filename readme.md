@@ -2,6 +2,17 @@
 
 Real-time arbitrage opportunity detector for cryptocurrency trading across multiple exchanges.
 
+## Documentation Index
+
+All in-depth documentation now lives under the [`docs/`](docs) directory. Start here:
+
+- [Project Summary](docs/PROJECT_SUMMARY.md)
+- [Arbitrage System Guide](docs/ARBITRAGE.md)
+- [Architecture Deep Dive](docs/ARCHITECTURE.md)
+- [Quick Start](docs/QUICKSTART.md)
+- [Change Log](docs/CHANGELOG.md)
+- [Completion Checklist](docs/COMPLETION_CHECKLIST.md)
+
 ## Features
 
 - 🔄 **Multi-Exchange Support**: Binance, Bybit, and extensible to more
@@ -29,7 +40,7 @@ Real-time arbitrage opportunity detector for cryptocurrency trading across multi
 └─────────────────────────────────────┘
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture.
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture.
 
 ## Quick Start
 
@@ -267,7 +278,7 @@ MIT License - see LICENSE file for details
 
 - 📖 [Development Guide](.github/DEVELOPMENT.md)
 - 🚀 [Superpowers Setup](.github/SUPERPOWERS.md)
-- 📋 [Architecture](.ARCHITECTURE.md)
+- 📋 [Architecture](docs/ARCHITECTURE.md)
 - 💬 [Issues](https://github.com/yourusername/xarb/issues)
 
 ## Acknowledgments

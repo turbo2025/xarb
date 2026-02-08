@@ -37,6 +37,10 @@ func New(path string) (*Repo, error) {
 
 func (r *Repo) Close() error { return r.db.Close() }
 
+func (r *Repo) GetDB() *sql.DB {
+	return r.db
+}
+
 func (r *Repo) migrate(ctx context.Context) error {
 	_, err := r.db.ExecContext(ctx, `
 CREATE TABLE IF NOT EXISTS prices (
@@ -83,6 +87,72 @@ CREATE TABLE IF NOT EXISTS signals (
 );
 CREATE INDEX IF NOT EXISTS idx_signals_ts ON signals(ts_ms);
 CREATE INDEX IF NOT EXISTS idx_signals_symbol ON signals(symbol);
+
+CREATE TABLE IF NOT EXISTS spread_opportunities (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  symbol TEXT NOT NULL,
+  long_exchange TEXT NOT NULL,
+  short_exchange TEXT NOT NULL,
+  long_price REAL NOT NULL,
+  short_price REAL NOT NULL,
+  spread REAL NOT NULL,
+  spread_abs REAL NOT NULL,
+  profit_percent REAL NOT NULL,
+  ts_ms INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_spread_symbol ON spread_opportunities(symbol);
+CREATE INDEX IF NOT EXISTS idx_spread_ts ON spread_opportunities(ts_ms);
+
+CREATE TABLE IF NOT EXISTS funding_opportunities (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  symbol TEXT NOT NULL,
+  long_exchange TEXT NOT NULL,
+  short_exchange TEXT NOT NULL,
+  long_funding REAL NOT NULL,
+  short_funding REAL NOT NULL,
+  funding_diff REAL NOT NULL,
+  holding_hours INTEGER NOT NULL,
+  expected_return REAL NOT NULL,
+  ts_ms INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_funding_symbol ON funding_opportunities(symbol);
+CREATE INDEX IF NOT EXISTS idx_funding_ts ON funding_opportunities(ts_ms);
+
+CREATE TABLE IF NOT EXISTS arbitrage_positions (
+  id TEXT PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  long_exchange TEXT NOT NULL,
+  short_exchange TEXT NOT NULL,
+  quantity REAL NOT NULL,
+  long_entry_price REAL NOT NULL,
+  short_entry_price REAL NOT NULL,
+  entry_spread REAL NOT NULL,
+  status TEXT NOT NULL,
+  open_time INTEGER NOT NULL,
+  close_time INTEGER,
+  realized_pnl REAL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_arb_pos_symbol ON arbitrage_positions(symbol);
+CREATE INDEX IF NOT EXISTS idx_arb_pos_status ON arbitrage_positions(status);
+CREATE INDEX IF NOT EXISTS idx_arb_pos_time ON arbitrage_positions(open_time);
+
+CREATE TABLE IF NOT EXISTS futures_prices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  exchange TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  price REAL NOT NULL,
+  funding REAL NOT NULL,
+  next_time INTEGER NOT NULL,
+  ts_ms INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE(exchange, symbol)
+);
+CREATE INDEX IF NOT EXISTS idx_futures_symbol ON futures_prices(symbol);
+CREATE INDEX IF NOT EXISTS idx_futures_ts ON futures_prices(ts_ms);
 `)
 	return err
 }

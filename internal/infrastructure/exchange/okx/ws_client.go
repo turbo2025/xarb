@@ -1,4 +1,4 @@
-package bitget
+package okx
 
 import (
 	"context"
@@ -14,42 +14,41 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type PublicMarketTickerFeed struct {
-	wsURL string // e.g., wss://ws.bitget.com/spot/v1/public
+type PublicLinearTickerFeed struct {
+	wsURL string // e.g., wss://ws.okx.com:8443/ws/v5/public
 }
 
-func NewPublicMarketTickerFeed(wsURL string) *PublicMarketTickerFeed {
-	return &PublicMarketTickerFeed{wsURL: strings.TrimSpace(wsURL)}
+func NewPublicLinearTickerFeed(wsURL string) *PublicLinearTickerFeed {
+	return &PublicLinearTickerFeed{wsURL: strings.TrimSpace(wsURL)}
 }
 
-func (f *PublicMarketTickerFeed) Name() string { return "BITGET" }
+func (f *PublicLinearTickerFeed) Name() string { return "OKX" }
 
-type bitgetSubReq struct {
-	Op   string         `json:"op"`
-	Args []bitgetSubArg `json:"args"`
+type okxSubReq struct {
+	Op   string      `json:"op"`
+	Args []okxSubArg `json:"args"`
 }
 
-type bitgetSubArg struct {
-	InstType string `json:"instType"`
-	Channel  string `json:"channel"`
-	InstID   string `json:"instId"`
+type okxSubArg struct {
+	Channel string `json:"channel"`
+	InstID  string `json:"instId"`
 }
 
-type bitgetTickerMsg struct {
-	Action string             `json:"action"`
-	Data   []bitgetTickerData `json:"data,omitempty"`
-	Arg    bitgetSubArg       `json:"arg,omitempty"`
+type okxTickerMsg struct {
+	Op   string          `json:"op"`
+	Data []okxTickerData `json:"data,omitempty"`
+	Arg  okxSubArg       `json:"arg,omitempty"`
 }
 
-type bitgetTickerData struct {
+type okxTickerData struct {
 	InstID string `json:"instId"`
 	Last   string `json:"last"`
 	Ts     string `json:"ts"`
 }
 
-func (f *PublicMarketTickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
+func (f *PublicLinearTickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
 	if f.wsURL == "" {
-		return nil, errors.New("bitget wsURL empty")
+		return nil, errors.New("okx wsURL empty")
 	}
 	if len(symbols) == 0 {
 		return nil, errors.New("symbols empty")
@@ -60,7 +59,7 @@ func (f *PublicMarketTickerFeed) Subscribe(ctx context.Context, symbols []string
 	return out, nil
 }
 
-func (f *PublicMarketTickerFeed) run(ctx context.Context, symbols []string, out chan<- port.Tick) {
+func (f *PublicLinearTickerFeed) run(ctx context.Context, symbols []string, out chan<- port.Tick) {
 	defer close(out)
 
 	backoff := 500 * time.Millisecond
@@ -88,21 +87,20 @@ func (f *PublicMarketTickerFeed) run(ctx context.Context, symbols []string, out 
 		log.Info().Str("feed", f.Name()).Msg("ws connected")
 
 		// Subscribe to ticker channels
-		args := make([]bitgetSubArg, 0, len(symbols))
+		args := make([]okxSubArg, 0, len(symbols))
 		for _, sym := range symbols {
 			sym = strings.TrimSpace(sym)
 			if sym == "" {
 				continue
 			}
-			args = append(args, bitgetSubArg{
-				InstType: "SPOT",
-				Channel:  "ticker",
-				InstID:   sym,
+			args = append(args, okxSubArg{
+				Channel: "tickers",
+				InstID:  sym,
 			})
 		}
 
 		if len(args) > 0 {
-			subReq := bitgetSubReq{
+			subReq := okxSubReq{
 				Op:   "subscribe",
 				Args: args,
 			}
@@ -112,14 +110,14 @@ func (f *PublicMarketTickerFeed) run(ctx context.Context, symbols []string, out 
 		}
 
 		err = readLoop(ctx, conn, func(b []byte) {
-			var msg bitgetTickerMsg
+			var msg okxTickerMsg
 			if e := json.Unmarshal(b, &msg); e != nil {
 				log.Error().Str("feed", f.Name()).Err(e).Msg("json unmarshal failed")
 				return
 			}
 
-			// Only process push action messages with ticker data
-			if msg.Action != "push" || len(msg.Data) == 0 {
+			// Only process data messages with ticker info
+			if len(msg.Data) == 0 {
 				return
 			}
 
@@ -141,7 +139,7 @@ func (f *PublicMarketTickerFeed) run(ctx context.Context, symbols []string, out 
 				}
 
 				out <- port.Tick{
-					Exchange: "BITGET",
+					Exchange: "OKX",
 					Symbol:   sym,
 					PriceStr: pxs,
 					PriceNum: pxn,
@@ -177,6 +175,9 @@ func readLoop(ctx context.Context, conn *websocket.Conn, onMsg func([]byte)) err
 		defer close(errCh)
 		for {
 			_, b, err := conn.ReadMessage()
+			if err == nil {
+				_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			}
 			if err != nil {
 				errCh <- err
 				return

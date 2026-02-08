@@ -7,7 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"xarb/internal/application/service"
 	"xarb/internal/application/usecase/monitor"
+	domainservice "xarb/internal/domain/service"
 	"xarb/internal/infrastructure/config"
 	"xarb/internal/infrastructure/container"
 	"xarb/internal/infrastructure/exchange/binance"
@@ -53,7 +55,17 @@ func main() {
 
 	repo := monitor.NewNoopRepo()
 
-	// Create service
+	// 初始化套利计算器
+	arbCalc := service.NewArbitrageCalculator(0.0002) // 默认手续费 0.02%
+
+	// 初始化符号映射器（可选）
+	symbolMapper := domainservice.NewSymbolMapper()
+	// 加载默认的多交易所、多结算货币配置
+	if err := symbolMapper.LoadDefaultConfig(); err != nil {
+		log.Warn().Err(err).Msg("failed to load default symbol mapping")
+	}
+
+	// Create service with full arbitrage support
 	svc := monitor.NewService(monitor.ServiceDeps{
 		Feeds:          feeds,
 		Symbols:        cfg.Symbols.List,
@@ -61,6 +73,9 @@ func main() {
 		DeltaThreshold: cfg.Arbitrage.DeltaThreshold,
 		Sink:           sink,
 		Repo:           repo,
+		ArbitrageRepo:  cont.SQLiteArbitrageRepo(), // 使用真实的 SQLite 套利仓储
+		ArbitrageCalc:  arbCalc,                    // 套利计算器
+		SymbolMapper:   symbolMapper,               // 符号映射器
 	})
 
 	// Log startup info

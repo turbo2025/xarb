@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"xarb/internal/application/port"
+	"xarb/internal/application/service"
+	domainservice "xarb/internal/domain/service"
 
 	"github.com/rs/zerolog/log"
 )
@@ -19,6 +21,9 @@ type ServiceDeps struct {
 	DeltaThreshold float64
 	Sink           port.Sink
 	Repo           port.Repository
+	ArbitrageRepo  port.ArbitrageRepository     // 新增：套利仓储
+	ArbitrageCalc  *service.ArbitrageCalculator // 新增：套利计算器
+	SymbolMapper   *domainservice.SymbolMapper  // 新增：符号映射器（可选）
 }
 
 type Service struct {
@@ -100,7 +105,7 @@ func (s *Service) Run(ctx context.Context) error {
 				_ = s.deps.Repo.UpsertLatestPrice(ctx, t.Exchange, t.Symbol, t.PriceNum, t.Ts)
 			}
 
-			// ---- NEW: threshold crossing detection ----
+			// ---- threshold crossing detection ----
 			delta, band, ok := s.st.DeltaBand(t.Symbol, s.deps.DeltaThreshold)
 			if !ok {
 				continue

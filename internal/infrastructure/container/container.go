@@ -152,6 +152,14 @@ func (c *Container) SQLiteRepo() *sqliterepo.Repo {
 	return c.sqliteRepo
 }
 
+// SQLiteArbitrageRepo 获取 SQLite 套利仓储
+func (c *Container) SQLiteArbitrageRepo() *sqliterepo.ArbitrageRepo {
+	if c.sqliteRepo == nil {
+		return nil
+	}
+	return sqliterepo.NewArbitrageRepo(c.sqliteRepo.GetDB())
+}
+
 // Close 关闭所有资源（按后进先出顺序）
 func (c *Container) Close() error {
 	var err error

@@ -150,6 +150,9 @@ func readLoop(ctx context.Context, conn *websocket.Conn, onMsg func([]byte)) err
 		defer close(errCh)
 		for {
 			_, b, err := conn.ReadMessage()
+			if err == nil {
+				_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			}
 			if err != nil {
 				errCh <- err
 				return

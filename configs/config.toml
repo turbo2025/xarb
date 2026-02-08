@@ -2,8 +2,8 @@
 print_every_min = 5
 
 [symbols]
-#list = ["BTCUSDT", "ZECUSDT", "WLFIUSDT", "RIVERUSDT"]
-list = ["BTCUSDT", "ZECUSDT", "ASTERUSDT", "RIVERUSDT"]
+list = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+# list = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "ZECUSDT", "AAVEUSDT"]
 
 [arbitrage]
 delta_threshold = 5.0
@@ -19,12 +19,12 @@ ws_url = "wss://stream.bybit.com/v5/public/linear"
 balance = 500
 
 [exchange.okx]
-enabled = true
+enabled = false
 ws_url = "wss://ws.okx.com:8443/ws/v5/public"
 balance = 500
 
 [exchange.bitget]
-enabled = true
+enabled = false
 ws_url = "wss://ws.bitget.com/spot/v1/public/stream"
 balance = 500
 
