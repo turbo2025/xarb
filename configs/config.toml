@@ -9,7 +9,7 @@ list = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
 delta_threshold = 5.0
 
 [exchange.binance]
-enabled = false
+enabled = true
 api_key = "GODOZ5H4IQVahtXu216X5kdQBTbYT4tNf5LydQWuxexlMJZrw0xbQvrL1BP1PunN"
 secret_key = "j14JDmShOc6SUppf6Uz4vhnQwsbUGK6f2NzfTV4hGcnkwCJaXq8OtNbZUx5gLINU"
 futures_url = "https://fapi.binance.com"
@@ -17,7 +17,7 @@ spot_url = "https://api.binance.com"
 ws_url = "wss://fstream.binance.com/ws"
 
 [exchange.bybit]
-enabled = false
+enabled = true
 api_key = "ovxG4pT6BFE8Oh7b7E"
 secret_key = "gPfgyDrfR4WswFdPgVpXsbnSEQeaCcX30Lsu"
 linear_url = "https://api.bybit.com"
