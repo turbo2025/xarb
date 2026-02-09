@@ -8,7 +8,7 @@ list = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
 [arbitrage]
 delta_threshold = 5.0
 
-[exchange.binance]
+[exchanges.binance]
 enabled = true
 api_key = "GODOZ5H4IQVahtXu216X5kdQBTbYT4tNf5LydQWuxexlMJZrw0xbQvrL1BP1PunN"
 secret_key = "j14JDmShOc6SUppf6Uz4vhnQwsbUGK6f2NzfTV4hGcnkwCJaXq8OtNbZUx5gLINU"
@@ -16,15 +16,15 @@ futures_url = "https://fapi.binance.com"
 spot_url = "https://api.binance.com"
 ws_url = "wss://fstream.binance.com/ws"
 
-[exchange.bybit]
+[exchanges.bybit]
 enabled = true
 api_key = "ovxG4pT6BFE8Oh7b7E"
 secret_key = "gPfgyDrfR4WswFdPgVpXsbnSEQeaCcX30Lsu"
-linear_url = "https://api.bybit.com"
+futures_url = "https://api.bybit.com"
 spot_url = "https://api.bybit.com"
 ws_url = "wss://stream.bybit.com/spot/quote/ws/v2"
 
-[exchange.okx]
+[exchanges.okx]
 enabled = false
 api_key = "dc6a2205-830f-4952-9acd-81d5b9ea2470"
 secret_key = "6218E25764E121957B36D854B4776FEC"
@@ -34,7 +34,7 @@ spot_url = "https://www.okx.com"
 ws_url = "wss://ws.okx.com:8443/ws/v5/public"
 
 
-[exchange.bitget]
+[exchanges.bitget]
 enabled = false
 api_key = "bg_6fe0bc583114ca91cb35c4c5a33b1c3d"
 secret_key = "50ec0bdaaa0d43e301fdf286029da7029b5d33dedd412d60e408c88624484710"

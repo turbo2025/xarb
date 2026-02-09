@@ -11,17 +11,17 @@ import (
 
 // SpotAccountClient Binance 现货账户查询客户端
 type SpotAccountClient struct {
-	*clientFields
+	credentials *Credentials
+	httpClient  *http.Client
+	baseURL     string
 }
 
 // NewSpotAccountClient 创建 Binance 现货账户客户端
 func NewSpotAccountClient(apiKey, apiSecret string) *SpotAccountClient {
 	return &SpotAccountClient{
-		clientFields: &clientFields{
-			apiKey:    apiKey,
-			apiSecret: apiSecret,
-			client:    &http.Client{Timeout: 10 * time.Second},
-		},
+		credentials: NewCredentials(apiKey, apiSecret),
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
+		baseURL:     "https://api.binance.com",
 	}
 }
 

@@ -2,9 +2,6 @@ package binance
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,21 +15,17 @@ import (
 
 // FuturesOrderClient Binance 期货 REST 客户端
 type FuturesOrderClient struct {
-	*clientFields
-	baseURL string
+	credentials *Credentials
+	httpClient  *http.Client
+	baseURL     string
 }
 
 // NewFuturesOrderClient 创建 Binance 期货客户端
 func NewFuturesOrderClient(apiKey, secretKey string) *FuturesOrderClient {
 	return &FuturesOrderClient{
-		clientFields: &clientFields{
-			apiKey:    apiKey,
-			apiSecret: secretKey,
-			client: &http.Client{
-				Timeout: time.Second * 30,
-			},
-		},
-		baseURL: "https://fapi.binance.com",
+		credentials: NewCredentials(apiKey, secretKey),
+		httpClient:  &http.Client{Timeout: time.Second * 30},
+		baseURL:     "https://fapi.binance.com",
 	}
 }
 
@@ -256,7 +249,7 @@ func (c *FuturesOrderClient) sendRequest(
 	params.Set("timestamp", strconv.FormatInt(time.Now().UnixMilli(), 10))
 
 	// 签名
-	signature := c.sign(params.Encode())
+	signature := c.credentials.Sign(params.Encode())
 	params.Set("signature", signature)
 
 	// 构建请求URL
@@ -268,11 +261,11 @@ func (c *FuturesOrderClient) sendRequest(
 	}
 
 	// 添加 API Key 头
-	req.Header.Set("X-MBX-APIKEY", c.apiKey)
+	req.Header.Set("X-MBX-APIKEY", c.credentials.APIKey())
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	// 执行请求
-	resp, err := c.client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -289,13 +282,6 @@ func (c *FuturesOrderClient) sendRequest(
 	}
 
 	return body, nil
-}
-
-// sign 生成签名
-func (c *FuturesOrderClient) sign(data string) string {
-	h := hmac.New(sha256.New, []byte(c.apiSecret))
-	h.Write([]byte(data))
-	return hex.EncodeToString(h.Sum(nil))
 }
 
 // ===== Response Models =====

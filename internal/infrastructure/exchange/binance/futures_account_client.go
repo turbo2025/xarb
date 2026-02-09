@@ -11,17 +11,17 @@ import (
 
 // FuturesAccountClient Binance 期货账户查询客户端
 type FuturesAccountClient struct {
-	*clientFields
+	credentials *Credentials
+	httpClient  *http.Client
+	baseURL     string
 }
 
 // NewFuturesAccountClient 创建 Binance 期货账户客户端
 func NewFuturesAccountClient(apiKey, apiSecret string) *FuturesAccountClient {
 	return &FuturesAccountClient{
-		clientFields: &clientFields{
-			apiKey:    apiKey,
-			apiSecret: apiSecret,
-			client:    &http.Client{Timeout: 10 * time.Second},
-		},
+		credentials: NewCredentials(apiKey, apiSecret),
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
+		baseURL:     "https://fapi.binance.com",
 	}
 }
 

@@ -9,19 +9,17 @@ import (
 
 // SpotOrderClient Binance 现货订单客户端
 type SpotOrderClient struct {
-	*clientFields
-	baseURL string
+	credentials *Credentials
+	httpClient  *http.Client
+	baseURL     string
 }
 
 // NewSpotOrderClient 创建 Binance 现货订单客户端
 func NewSpotOrderClient(apiKey, apiSecret string) *SpotOrderClient {
 	return &SpotOrderClient{
-		clientFields: &clientFields{
-			apiKey:    apiKey,
-			apiSecret: apiSecret,
-			client:    &http.Client{Timeout: 10 * time.Second},
-		},
-		baseURL: "https://api.binance.com",
+		credentials: NewCredentials(apiKey, apiSecret),
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
+		baseURL:     "https://api.binance.com",
 	}
 }
 

@@ -2,7 +2,7 @@ package factory
 
 import (
 	"context"
-	"time"
+	"fmt"
 
 	domainservice "xarb/internal/domain/service"
 	"xarb/internal/infrastructure/config"
@@ -13,94 +13,119 @@ import (
 )
 
 // APIClients API 客户端容器
+// 职责: 只管理交易所客户端的初始化和注册
 type APIClients struct {
-	TradeTypeManager  *domainservice.TradeTypeManager
-	ArbitrageExecutor *domainservice.ArbitrageExecutor
+	ExchangeRegistry *ExchangeClientRegistry
 }
 
-// NewAPIClients 初始化所有 API 客户端
+// NewAPIClients 初始化所有交易所客户端
+// 策略: 动态遍历 cfg.Exchanges 并注册所有启用的交易所
 func NewAPIClients(cfg *config.Config) *APIClients {
-	tradeTypeManager := domainservice.NewTradeTypeManager()
+	registry := NewExchangeClientRegistry()
 
-	// 初始化期货客户端
-	futuresOrderMgr, futuresAccountMgr := newFuturesClients(cfg)
-	tradeTypeManager.SetFuturesClients(futuresOrderMgr, futuresAccountMgr)
-	log.Info().Msg("✓ Futures REST API clients initialized")
-
-	// 初始化现货客户端
-	spotOrderMgr, spotAccountMgr := newSpotClients(cfg)
-	tradeTypeManager.SetSpotClients(spotOrderMgr, spotAccountMgr)
-	log.Info().Msg("✓ Spot REST API clients initialized")
+	// 动态注册已启用的交易所
+	registerExchanges(registry, cfg)
 
 	return &APIClients{
-		TradeTypeManager:  tradeTypeManager,
-		ArbitrageExecutor: domainservice.NewArbitrageExecutor(),
+		ExchangeRegistry: registry,
 	}
 }
 
-// newFuturesClients 初始化期货客户端
-func newFuturesClients(cfg *config.Config) (*domainservice.OrderManager, *domainservice.AccountManager) {
-	accountManager := domainservice.NewAccountManager(5 * time.Second)
+// registerExchanges 根据配置动态注册所有启用的交易所
+func registerExchanges(registry *ExchangeClientRegistry, cfg *config.Config) {
+	// Binance
+	if cfg.Exchanges.Binance.Enabled {
+		registry.RegisterBinance(
+			cfg.Exchanges.Binance.APIKey,
+			cfg.Exchanges.Binance.SecretKey,
+			cfg.Exchanges.Binance.FuturesURL,
+			cfg.Exchanges.Binance.SpotURL,
+		)
+		log.Info().Msg("✓ Binance clients registered (Spot + Futures)")
+	}
 
-	// 创建 Binance 期货管理器
-	binanceFuturesMgr := binance.NewFuturesManager(
-		cfg.Exchange.Binance.APIKey,
-		cfg.Exchange.Binance.SecretKey,
-		cfg.Exchange.Binance.FuturesURL,
-	)
+	// Bybit
+	if cfg.Exchanges.Bybit.Enabled {
+		registry.RegisterBybit(
+			cfg.Exchanges.Bybit.APIKey,
+			cfg.Exchanges.Bybit.SecretKey,
+			cfg.Exchanges.Bybit.FuturesURL,
+			cfg.Exchanges.Bybit.SpotURL,
+		)
+		log.Info().Msg("✓ Bybit clients registered (Spot + Futures)")
+	}
 
-	// 创建 Bybit 线性期货管理器
-	bybitLinearMgr := bybit.NewLinearManager(
-		cfg.Exchange.Bybit.APIKey,
-		cfg.Exchange.Bybit.SecretKey,
-		cfg.Exchange.Bybit.LinearURL,
-	)
+	// OKX (预留)
+	// if cfg.Exchanges.OKX.Enabled {
+	// 	registry.RegisterOKX(...)
+	// 	log.Info().Msg("✓ OKX clients registered (Spot + Futures)")
+	// }
 
-	// 注册账户客户端
-	accountManager.RegisterClient("binance", binanceFuturesMgr.Account)
-	accountManager.RegisterClient("bybit", bybitLinearMgr.Account)
-
-	// 创建订单管理器
-	orderManager := domainservice.NewOrderManager(
-		newBinanceOrderAdapter(binanceFuturesMgr.Order),
-		newBybitOrderAdapter(bybitLinearMgr.Order),
-	)
-
-	return orderManager, accountManager
+	// Bitget (预留)
+	// if cfg.Exchanges.Bitget.Enabled {
+	// 	registry.RegisterBitget(...)
+	// 	log.Info().Msg("✓ Bitget clients registered (Spot + Futures)")
+	// }
 }
 
-// newSpotClients 初始化现货客户端
-func newSpotClients(cfg *config.Config) (*domainservice.OrderManager, *domainservice.AccountManager) {
-	accountManager := domainservice.NewAccountManager(5 * time.Second)
+// ============================================
+// 辅助函数: 为 ServiceContext 构建所需的 Manager
+// ============================================
 
-	// 创建 Binance 现货管理器
-	binanceSpotMgr := binance.NewSpotManager(
-		cfg.Exchange.Binance.APIKey,
-		cfg.Exchange.Binance.SecretKey,
-		cfg.Exchange.Binance.SpotURL,
-	)
+// BuildFuturesOrderManager 从 Registry 构建期货订单管理器
+func (api *APIClients) BuildFuturesOrderManager() (*domainservice.OrderManager, error) {
+	binanceClients, binanceErr := api.ExchangeRegistry.GetBizSet(ExchangeBinance, TradeTypeFutures)
+	bybitClients, bybitErr := api.ExchangeRegistry.GetBizSet(ExchangeBybit, TradeTypeFutures)
 
-	// 创建 Bybit 现货管理器
-	bybitSpotMgr := bybit.NewSpotManager(
-		cfg.Exchange.Bybit.APIKey,
-		cfg.Exchange.Bybit.SecretKey,
-		cfg.Exchange.Bybit.SpotURL,
-	)
+	var binanceAdapter domainservice.OrderClient
+	var bybitAdapter domainservice.OrderClient
 
-	// 注册账户客户端
-	accountManager.RegisterClient("binance", binanceSpotMgr.Account)
-	accountManager.RegisterClient("bybit", bybitSpotMgr.Account)
+	if binanceErr == nil && binanceClients != nil {
+		if futuresOrder, ok := binanceClients.Order.(*binance.FuturesOrderClient); ok {
+			binanceAdapter = newBinanceOrderAdapter(futuresOrder)
+		}
+	}
 
-	// 创建订单管理器
-	orderManager := domainservice.NewOrderManager(
-		newBinanceSpotOrderAdapter(binanceSpotMgr.Order),
-		newBybitSpotOrderAdapter(bybitSpotMgr.Order),
-	)
+	if bybitErr == nil && bybitClients != nil {
+		if linearOrder, ok := bybitClients.Order.(*bybit.LinearOrderClient); ok {
+			bybitAdapter = newBybitOrderAdapter(linearOrder)
+		}
+	}
 
-	return orderManager, accountManager
+	if binanceAdapter == nil && bybitAdapter == nil {
+		return nil, fmt.Errorf("no futures order clients available")
+	}
+
+	return domainservice.NewOrderManager(binanceAdapter, bybitAdapter), nil
 }
 
-// Binance 期货订单适配器
+// BuildSpotOrderManager 从 Registry 构建现货订单管理器
+func (api *APIClients) BuildSpotOrderManager() (*domainservice.OrderManager, error) {
+	binanceClients, binanceErr := api.ExchangeRegistry.GetBizSet(ExchangeBinance, TradeTypeSpot)
+	bybitClients, bybitErr := api.ExchangeRegistry.GetBizSet(ExchangeBybit, TradeTypeSpot)
+
+	var binanceAdapter domainservice.OrderClient
+	var bybitAdapter domainservice.OrderClient
+
+	if binanceErr == nil && binanceClients != nil {
+		if spotOrder, ok := binanceClients.Order.(*binance.SpotOrderClient); ok {
+			binanceAdapter = newBinanceSpotOrderAdapter(spotOrder)
+		}
+	}
+
+	if bybitErr == nil && bybitClients != nil {
+		if spotOrder, ok := bybitClients.Order.(*bybit.SpotOrderClient); ok {
+			bybitAdapter = newBybitSpotOrderAdapter(spotOrder)
+		}
+	}
+
+	if binanceAdapter == nil && bybitAdapter == nil {
+		return nil, fmt.Errorf("no spot order clients available")
+	}
+
+	return domainservice.NewOrderManager(binanceAdapter, bybitAdapter), nil
+}
+
 type binanceOrderClientAdapter struct {
 	client *binance.FuturesOrderClient
 }
@@ -180,7 +205,7 @@ func (a *bybitOrderClientAdapter) GetFundingRate(ctx context.Context, symbol str
 	return a.client.GetFundingRate(ctx, symbol)
 }
 
-// Binance 现货订单适配器
+// Binance 现货订单适配器（复用期货适配器逻辑）
 type binanceSpotOrderClientAdapter struct {
 	client *binance.SpotOrderClient
 }
@@ -217,6 +242,7 @@ func (a *binanceSpotOrderClientAdapter) GetOrderStatus(ctx context.Context, symb
 }
 
 func (a *binanceSpotOrderClientAdapter) GetFundingRate(ctx context.Context, symbol string) (float64, error) {
+	// Spot trading does not have funding rates
 	return a.client.GetFundingRate(ctx, symbol)
 }
 

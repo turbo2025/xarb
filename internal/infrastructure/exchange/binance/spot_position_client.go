@@ -11,17 +11,17 @@ import (
 
 // SpotPositionClient Binance 现货持仓（钱包）客户端
 type SpotPositionClient struct {
-	*clientFields
+	credentials *Credentials
+	httpClient  *http.Client
+	baseURL     string
 }
 
 // NewSpotPositionClient 创建 Binance 现货持仓客户端
 func NewSpotPositionClient(apiKey, apiSecret string) *SpotPositionClient {
 	return &SpotPositionClient{
-		clientFields: &clientFields{
-			apiKey:    apiKey,
-			apiSecret: apiSecret,
-			client:    &http.Client{Timeout: 10 * time.Second},
-		},
+		credentials: NewCredentials(apiKey, apiSecret),
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
+		baseURL:     "https://api.binance.com",
 	}
 }
 

@@ -11,17 +11,17 @@ import (
 
 // FuturesPositionClient Binance 期货持仓客户端
 type FuturesPositionClient struct {
-	*clientFields
+	credentials *Credentials
+	httpClient  *http.Client
+	baseURL     string
 }
 
 // NewFuturesPositionClient 创建 Binance 期货持仓客户端
 func NewFuturesPositionClient(apiKey, apiSecret string) *FuturesPositionClient {
 	return &FuturesPositionClient{
-		clientFields: &clientFields{
-			apiKey:    apiKey,
-			apiSecret: apiSecret,
-			client:    &http.Client{Timeout: 10 * time.Second},
-		},
+		credentials: NewCredentials(apiKey, apiSecret),
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
+		baseURL:     "https://fapi.binance.com",
 	}
 }
 
