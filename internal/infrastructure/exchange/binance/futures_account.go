@@ -21,7 +21,6 @@ func NewFuturesAccountClient(apiKey, apiSecret string) *FuturesAccountClient {
 	return &FuturesAccountClient{
 		credentials: NewCredentials(apiKey, apiSecret),
 		httpClient:  &http.Client{Timeout: 10 * time.Second},
-		baseURL:     "https://fapi.binance.com",
 	}
 }
 

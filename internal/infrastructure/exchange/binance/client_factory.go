@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
-	"time"
 )
 
 // ===== Credentials 凭证 =====
@@ -38,6 +37,8 @@ func (c *Credentials) APIKey() string {
 
 // ===== Manager 结构 =====
 
+// ===== Manager 结构 =====
+
 // FuturesManager Binance 期货统一管理器
 type FuturesManager struct {
 	Order    *FuturesOrderClient
@@ -46,14 +47,24 @@ type FuturesManager struct {
 }
 
 // NewFuturesManager 创建 Binance 期货管理器（凭证在此初始化一次）
-func NewFuturesManager(apiKey, apiSecret, baseURL string) *FuturesManager {
-	// 交易所级别的凭证只需初始化一次，然后所有业务客户端共享
+func NewFuturesManager(apiKey, apiSecret, baseURL string, httpClient *http.Client) *FuturesManager {
 	credentials := NewCredentials(apiKey, apiSecret)
-	httpClient := &http.Client{Timeout: 10 * time.Second}
 	return &FuturesManager{
-		Order:    newFuturesOrderClient(credentials, httpClient, baseURL),
-		Account:  newFuturesAccountClient(credentials, httpClient, baseURL),
-		Position: newFuturesPositionClient(credentials, httpClient, baseURL),
+		Order: &FuturesOrderClient{
+			credentials: credentials,
+			httpClient:  httpClient,
+			baseURL:     baseURL,
+		},
+		Account: &FuturesAccountClient{
+			credentials: credentials,
+			httpClient:  httpClient,
+			baseURL:     baseURL,
+		},
+		Position: &FuturesPositionClient{
+			credentials: credentials,
+			httpClient:  httpClient,
+			baseURL:     baseURL,
+		},
 	}
 }
 
@@ -65,69 +76,23 @@ type SpotManager struct {
 }
 
 // NewSpotManager 创建 Binance 现货管理器（凭证在此初始化一次）
-func NewSpotManager(apiKey, apiSecret, baseURL string) *SpotManager {
-	// 交易所级别的凭证只需初始化一次，然后所有业务客户端共享
+func NewSpotManager(apiKey, apiSecret, baseURL string, httpClient *http.Client) *SpotManager {
 	credentials := NewCredentials(apiKey, apiSecret)
-	httpClient := &http.Client{Timeout: 10 * time.Second}
 	return &SpotManager{
-		Order:    newSpotOrderClient(credentials, httpClient, baseURL),
-		Account:  newSpotAccountClient(credentials, httpClient, baseURL),
-		Position: newSpotPositionClient(credentials, httpClient, baseURL),
-	}
-}
-
-// ===== 内部工厂函数 =====
-
-// newFuturesOrderClient 创建期货订单客户端
-func newFuturesOrderClient(credentials *Credentials, httpClient *http.Client, baseURL string) *FuturesOrderClient {
-	return &FuturesOrderClient{
-		credentials: credentials,
-		httpClient:  httpClient,
-		baseURL:     baseURL,
-	}
-}
-
-// newFuturesAccountClient 创建期货账户客户端
-func newFuturesAccountClient(credentials *Credentials, httpClient *http.Client, baseURL string) *FuturesAccountClient {
-	return &FuturesAccountClient{
-		credentials: credentials,
-		httpClient:  httpClient,
-		baseURL:     baseURL,
-	}
-}
-
-// newFuturesPositionClient 创建期货持仓客户端
-func newFuturesPositionClient(credentials *Credentials, httpClient *http.Client, baseURL string) *FuturesPositionClient {
-	return &FuturesPositionClient{
-		credentials: credentials,
-		httpClient:  httpClient,
-		baseURL:     baseURL,
-	}
-}
-
-// newSpotOrderClient 创建现货订单客户端
-func newSpotOrderClient(credentials *Credentials, httpClient *http.Client, baseURL string) *SpotOrderClient {
-	return &SpotOrderClient{
-		credentials: credentials,
-		httpClient:  httpClient,
-		baseURL:     baseURL,
-	}
-}
-
-// newSpotAccountClient 创建现货账户客户端
-func newSpotAccountClient(credentials *Credentials, httpClient *http.Client, baseURL string) *SpotAccountClient {
-	return &SpotAccountClient{
-		credentials: credentials,
-		httpClient:  httpClient,
-		baseURL:     baseURL,
-	}
-}
-
-// newSpotPositionClient 创建现货持仓客户端
-func newSpotPositionClient(credentials *Credentials, httpClient *http.Client, baseURL string) *SpotPositionClient {
-	return &SpotPositionClient{
-		credentials: credentials,
-		httpClient:  httpClient,
-		baseURL:     baseURL,
+		Order: &SpotOrderClient{
+			credentials: credentials,
+			httpClient:  httpClient,
+			baseURL:     baseURL,
+		},
+		Account: &SpotAccountClient{
+			credentials: credentials,
+			httpClient:  httpClient,
+			baseURL:     baseURL,
+		},
+		Position: &SpotPositionClient{
+			credentials: credentials,
+			httpClient:  httpClient,
+			baseURL:     baseURL,
+		},
 	}
 }

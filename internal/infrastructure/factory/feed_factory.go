@@ -15,32 +15,30 @@ import (
 func NewPriceFeeds(cfg *config.Config) []monitor.PriceFeed {
 	var feeds []monitor.PriceFeed
 
-	if cfg.Exchanges.Binance.Enabled {
-		feeds = append(feeds, binance.NewFuturesMiniTickerFeed(cfg.Exchanges.Binance.WsURL))
-		log.Info().Msg("✓ Binance feed initialized")
-	} else {
-		log.Warn().Msg("⚠️ Binance disabled by config")
-	}
+	// 遍历所有启用的交易所并初始化数据源
+	for exchangeName, exchCfg := range cfg.Exchanges {
+		if !exchCfg.Enabled {
+			log.Warn().Msgf("⚠️ %s disabled by config", exchangeName)
+			continue
+		}
 
-	if cfg.Exchanges.Bybit.Enabled {
-		feeds = append(feeds, bybit.NewLinearTickerFeed(cfg.Exchanges.Bybit.WsURL))
-		log.Info().Msg("✓ Bybit feed initialized")
-	} else {
-		log.Warn().Msg("⚠️ Bybit disabled by config")
-	}
+		var feed monitor.PriceFeed
+		switch exchangeName {
+		case "binance":
+			feed = binance.NewFuturesMiniTickerFeed(exchCfg.WsURL)
+		case "bybit":
+			feed = bybit.NewLinearTickerFeed(exchCfg.WsURL)
+		case "okx":
+			feed = okx.NewPublicLinearTickerFeed(exchCfg.WsURL)
+		case "bitget":
+			feed = bitget.NewPublicMarketTickerFeed(exchCfg.WsURL)
+		default:
+			log.Warn().Msgf("⚠️ Unknown exchange: %s", exchangeName)
+			continue
+		}
 
-	if cfg.Exchanges.OKX.Enabled {
-		feeds = append(feeds, okx.NewPublicLinearTickerFeed(cfg.Exchanges.OKX.WsURL))
-		log.Info().Msg("✓ OKX feed initialized")
-	} else {
-		log.Warn().Msg("⚠️ OKX disabled by config")
-	}
-
-	if cfg.Exchanges.Bitget.Enabled {
-		feeds = append(feeds, bitget.NewPublicMarketTickerFeed(cfg.Exchanges.Bitget.WsURL))
-		log.Info().Msg("✓ Bitget feed initialized")
-	} else {
-		log.Warn().Msg("⚠️ Bitget disabled by config")
+		feeds = append(feeds, feed)
+		log.Info().Msgf("✓ %s feed initialized", exchangeName)
 	}
 
 	return feeds

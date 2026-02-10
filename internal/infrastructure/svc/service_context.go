@@ -91,20 +91,24 @@ func (sc *ServiceContext) initializeComponents() error {
 	}
 
 	// 3. 初始化交易所客户端（自动注册 enabled=true 的交易所）
-	apiClients := factory.NewAPIClients(sc.Config)
+	apiClients, err := factory.NewAPIClients(sc.Config)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to initialize API clients")
+		return err
+	}
 
 	// 4. 初始化业务组件
 	sc.arbitrageExecutor = domainservice.NewArbitrageExecutor()
 
 	// 5. 从 ExchangeRegistry 构建所需的 Manager
-	futuresOrderMgr, err := apiClients.BuildFuturesOrderManager()
+	futuresOrderMgr, err := buildFuturesOrderManager(apiClients)
 	if err != nil {
 		log.Warn().Err(err).Msg("failed to build futures order manager")
 	} else {
 		sc.futuresOrderManager = futuresOrderMgr
 	}
 
-	spotOrderMgr, err := apiClients.BuildSpotOrderManager()
+	spotOrderMgr, err := buildSpotOrderManager(apiClients)
 	if err != nil {
 		log.Warn().Err(err).Msg("failed to build spot order manager")
 	} else {
@@ -288,4 +292,54 @@ func (sc *ServiceContext) Close() error {
 	}
 
 	return nil
+}
+
+// ============================================
+// Helper Functions: 构建业务组件
+// ============================================
+
+// buildFuturesOrderManager 从 Registry 构建期货订单管理器
+func buildFuturesOrderManager(apiClients *factory.APIClients) (*domainservice.OrderManager, error) {
+	binanceClients := apiClients.ExchangeRegistry.BinanceFutures()
+	bybitClients := apiClients.ExchangeRegistry.BybitFutures()
+
+	var binanceAdapter domainservice.OrderClient
+	var bybitAdapter domainservice.OrderClient
+
+	if binanceClients != nil && binanceClients.Order != nil {
+		binanceAdapter = factory.NewBinanceOrderAdapter(binanceClients.Order)
+	}
+
+	if bybitClients != nil && bybitClients.Order != nil {
+		bybitAdapter = factory.NewBybitOrderAdapter(bybitClients.Order)
+	}
+
+	if binanceAdapter == nil && bybitAdapter == nil {
+		return nil, fmt.Errorf("no futures order clients available")
+	}
+
+	return domainservice.NewOrderManager(binanceAdapter, bybitAdapter), nil
+}
+
+// buildSpotOrderManager 从 Registry 构建现货订单管理器
+func buildSpotOrderManager(apiClients *factory.APIClients) (*domainservice.OrderManager, error) {
+	binanceClients := apiClients.ExchangeRegistry.BinanceSpot()
+	bybitClients := apiClients.ExchangeRegistry.BybitSpot()
+
+	var binanceAdapter domainservice.OrderClient
+	var bybitAdapter domainservice.OrderClient
+
+	if binanceClients != nil && binanceClients.Order != nil {
+		binanceAdapter = factory.NewBinanceSpotOrderAdapter(binanceClients.Order)
+	}
+
+	if bybitClients != nil && bybitClients.Order != nil {
+		bybitAdapter = factory.NewBybitSpotOrderAdapter(bybitClients.Order)
+	}
+
+	if binanceAdapter == nil && bybitAdapter == nil {
+		return nil, fmt.Errorf("no spot order clients available")
+	}
+
+	return domainservice.NewOrderManager(binanceAdapter, bybitAdapter), nil
 }

@@ -2,7 +2,6 @@ package bybit
 
 import (
 	"net/http"
-	"time"
 )
 
 // clientFields 共享客户端字段
@@ -23,8 +22,8 @@ type LinearManager struct {
 }
 
 // NewLinearManager 创建 Bybit 线性期货管理器
-func NewLinearManager(apiKey, apiSecret, baseURL string) *LinearManager {
-	client := NewLinearClient(apiKey, apiSecret, baseURL)
+func NewLinearManager(apiKey, apiSecret, baseURL string, httpClient *http.Client) *LinearManager {
+	client := NewLinearClient(apiKey, apiSecret, baseURL, httpClient)
 	return &LinearManager{
 		Order:    client.OrderClient(),
 		Account:  client.AccountClient(),
@@ -40,8 +39,8 @@ type SpotManager struct {
 }
 
 // NewSpotManager 创建 Bybit 现货管理器
-func NewSpotManager(apiKey, apiSecret, baseURL string) *SpotManager {
-	client := NewSpotClient(apiKey, apiSecret, baseURL)
+func NewSpotManager(apiKey, apiSecret, baseURL string, httpClient *http.Client) *SpotManager {
+	client := NewSpotClient(apiKey, apiSecret, baseURL, httpClient)
 	return &SpotManager{
 		Order:    client.OrderClient(),
 		Account:  client.AccountClient(),
@@ -57,12 +56,12 @@ type LinearClient struct {
 }
 
 // NewLinearClient 创建 Bybit 线性期货客户端工厂
-func NewLinearClient(apiKey, apiSecret, baseURL string) *LinearClient {
+func NewLinearClient(apiKey, apiSecret, baseURL string, httpClient *http.Client) *LinearClient {
 	return &LinearClient{
 		fields: &clientFields{
 			apiKey:     apiKey,
 			apiSecret:  apiSecret,
-			httpClient: &http.Client{Timeout: 10 * time.Second},
+			httpClient: httpClient,
 			baseURL:    baseURL,
 		},
 	}
@@ -92,12 +91,12 @@ type SpotClient struct {
 }
 
 // NewSpotClient 创建 Bybit 现货客户端工厂
-func NewSpotClient(apiKey, apiSecret, baseURL string) *SpotClient {
+func NewSpotClient(apiKey, apiSecret, baseURL string, httpClient *http.Client) *SpotClient {
 	return &SpotClient{
 		fields: &clientFields{
 			apiKey:     apiKey,
 			apiSecret:  apiSecret,
-			httpClient: &http.Client{Timeout: 10 * time.Second},
+			httpClient: httpClient,
 			baseURL:    baseURL,
 		},
 	}

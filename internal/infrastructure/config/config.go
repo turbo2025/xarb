@@ -2,10 +2,22 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 )
+
+// ExchangeConfig 交易所配置（通用格式）
+type ExchangeConfig struct {
+	Enabled    bool   `toml:"enabled"`
+	APIKey     string `toml:"api_key"`
+	SecretKey  string `toml:"secret_key"`
+	Passphrase string `toml:"passphrase"` // 仅 OKX、Bitget 需要
+	FuturesURL string `toml:"futures_url"`
+	SpotURL    string `toml:"spot_url"`
+	WsURL      string `toml:"ws_url"`
+}
 
 type Config struct {
 	App struct {
@@ -20,45 +32,7 @@ type Config struct {
 		DeltaThreshold float64 `toml:"delta_threshold"`
 	} `toml:"arbitrage"`
 
-	Exchanges struct {
-		Binance struct {
-			Enabled    bool   `toml:"enabled"`
-			APIKey     string `toml:"api_key"`
-			SecretKey  string `toml:"secret_key"`
-			FuturesURL string `toml:"futures_url"`
-			SpotURL    string `toml:"spot_url"`
-			WsURL      string `toml:"ws_url"`
-		} `toml:"binance"`
-
-		Bybit struct {
-			Enabled    bool   `toml:"enabled"`
-			APIKey     string `toml:"api_key"`
-			SecretKey  string `toml:"secret_key"`
-			FuturesURL string `toml:"futures_url"`
-			SpotURL    string `toml:"spot_url"`
-			WsURL      string `toml:"ws_url"`
-		} `toml:"bybit"`
-
-		OKX struct {
-			Enabled    bool   `toml:"enabled"`
-			APIKey     string `toml:"api_key"`
-			SecretKey  string `toml:"secret_key"`
-			Passphrase string `toml:"passphrase"`
-			FuturesURL string `toml:"futures_url"`
-			SpotURL    string `toml:"spot_url"`
-			WsURL      string `toml:"ws_url"`
-		} `toml:"okx"`
-
-		Bitget struct {
-			Enabled    bool   `toml:"enabled"`
-			APIKey     string `toml:"api_key"`
-			SecretKey  string `toml:"secret_key"`
-			Passphrase string `toml:"passphrase"`
-			FuturesURL string `toml:"futures_url"`
-			SpotURL    string `toml:"spot_url"`
-			WsURL      string `toml:"ws_url"`
-		} `toml:"bitget"`
-	} `toml:"exchanges"`
+	Exchanges map[string]ExchangeConfig `toml:"exchanges"`
 
 	Storage struct {
 		Enabled bool `toml:"enabled"`
@@ -127,17 +101,14 @@ func validate(cfg *Config) error {
 		return errors.New("symbols.list is empty")
 	}
 
-	if cfg.Exchanges.Binance.Enabled && strings.TrimSpace(cfg.Exchanges.Binance.WsURL) == "" {
-		return errors.New("exchange.binance.ws_url empty but enabled")
-	}
-	if cfg.Exchanges.Bybit.Enabled && strings.TrimSpace(cfg.Exchanges.Bybit.WsURL) == "" {
-		return errors.New("exchange.bybit.ws_url empty but enabled")
-	}
-	if cfg.Exchanges.OKX.Enabled && strings.TrimSpace(cfg.Exchanges.OKX.WsURL) == "" {
-		return errors.New("exchange.okx.ws_url empty but enabled")
-	}
-	if cfg.Exchanges.Bitget.Enabled && strings.TrimSpace(cfg.Exchanges.Bitget.WsURL) == "" {
-		return errors.New("exchange.bitget.ws_url empty but enabled")
+	// 验证所有启用的交易所都有必要的配置
+	for exchangeName, exchCfg := range cfg.Exchanges {
+		if !exchCfg.Enabled {
+			continue
+		}
+		if strings.TrimSpace(exchCfg.WsURL) == "" {
+			return fmt.Errorf("exchange.%s.ws_url empty but enabled", exchangeName)
+		}
 	}
 
 	// storage validation only if storage.enabled
