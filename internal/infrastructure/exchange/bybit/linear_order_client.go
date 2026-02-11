@@ -17,28 +17,14 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// LinearOrderClient Bybit 线性永续 REST 客户端 (V5 API)
-type LinearOrderClient struct {
-	*clientFields
+// FuturesOrderClient Bybit 期货 REST 客户端 (V5 API)
+type FuturesOrderClient struct {
+	*ClientFields
 	baseURL string
 }
 
-// NewLinearOrderClient 创建 Bybit 线性永续客户端
-func NewLinearOrderClient(apiKey, secretKey string) *LinearOrderClient {
-	return &LinearOrderClient{
-		clientFields: &clientFields{
-			apiKey:    apiKey,
-			apiSecret: secretKey,
-			httpClient: &http.Client{
-				Timeout: time.Second * 30,
-			},
-		},
-		baseURL: "https://api.bybit.com",
-	}
-}
-
 // PlaceOrder 下单
-func (c *LinearOrderClient) PlaceOrder(
+func (c *FuturesOrderClient) PlaceOrder(
 	ctx context.Context,
 	symbol string,
 	side string,
@@ -88,7 +74,7 @@ func (c *LinearOrderClient) PlaceOrder(
 }
 
 // CancelOrder 撤销订单
-func (c *LinearOrderClient) CancelOrder(ctx context.Context, symbol string, orderId string) error {
+func (c *FuturesOrderClient) CancelOrder(ctx context.Context, symbol string, orderId string) error {
 	payload := map[string]interface{}{
 		"category": "linear",
 		"symbol":   symbol,
@@ -119,7 +105,7 @@ func (c *LinearOrderClient) CancelOrder(ctx context.Context, symbol string, orde
 }
 
 // GetOrderStatus 查询订单状态
-func (c *LinearOrderClient) GetOrderStatus(
+func (c *FuturesOrderClient) GetOrderStatus(
 	ctx context.Context,
 	symbol string,
 	orderId string,
@@ -170,7 +156,7 @@ func (c *LinearOrderClient) GetOrderStatus(
 }
 
 // GetFundingRate 获取融资费率
-func (c *LinearOrderClient) GetFundingRate(ctx context.Context, symbol string) (float64, error) {
+func (c *FuturesOrderClient) GetFundingRate(ctx context.Context, symbol string) (float64, error) {
 	params := url.Values{}
 	params.Set("category", "linear")
 	params.Set("symbol", symbol)
@@ -194,7 +180,7 @@ func (c *LinearOrderClient) GetFundingRate(ctx context.Context, symbol string) (
 }
 
 // GetAccount 查询账户信息
-func (c *LinearOrderClient) GetAccount(ctx context.Context) (*AccountInfo, error) {
+func (c *FuturesOrderClient) GetAccount(ctx context.Context) (*AccountInfo, error) {
 	params := url.Values{}
 	params.Set("accountType", "UNIFIED")
 
@@ -239,7 +225,7 @@ func (c *LinearOrderClient) GetAccount(ctx context.Context) (*AccountInfo, error
 }
 
 // GetOpenPositions 查询所有开仓持仓
-func (c *LinearOrderClient) GetOpenPositions(ctx context.Context) ([]*Position, error) {
+func (c *FuturesOrderClient) GetOpenPositions(ctx context.Context) ([]*Position, error) {
 	params := url.Values{}
 	params.Set("category", "linear")
 
@@ -284,7 +270,7 @@ func (c *LinearOrderClient) GetOpenPositions(ctx context.Context) ([]*Position, 
 }
 
 // sendRequest 发送 POST 请求
-func (c *LinearOrderClient) sendRequest(
+func (c *FuturesOrderClient) sendRequest(
 	ctx context.Context,
 	method string,
 	path string,
@@ -307,13 +293,13 @@ func (c *LinearOrderClient) sendRequest(
 	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	signature := c.sign(timestamp, string(jsonBody))
 
-	req.Header.Set("X-BAPI-API-KEY", c.apiKey)
+	req.Header.Set("X-BAPI-API-KEY", c.ApiKey)
 	req.Header.Set("X-BAPI-TIMESTAMP", timestamp)
 	req.Header.Set("X-BAPI-SIGN", signature)
 	req.Header.Set("Content-Type", "application/json")
 
 	// 执行请求
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HttpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +318,7 @@ func (c *LinearOrderClient) sendRequest(
 }
 
 // sendRequestWithQuery 发送 GET 请求
-func (c *LinearOrderClient) sendRequestWithQuery(
+func (c *FuturesOrderClient) sendRequestWithQuery(
 	ctx context.Context,
 	method string,
 	path string,
@@ -348,12 +334,12 @@ func (c *LinearOrderClient) sendRequestWithQuery(
 	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	signature := c.sign(timestamp, params.Encode())
 
-	req.Header.Set("X-BAPI-API-KEY", c.apiKey)
+	req.Header.Set("X-BAPI-API-KEY", c.ApiKey)
 	req.Header.Set("X-BAPI-TIMESTAMP", timestamp)
 	req.Header.Set("X-BAPI-SIGN", signature)
 
 	// 执行请求
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HttpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -372,8 +358,8 @@ func (c *LinearOrderClient) sendRequestWithQuery(
 }
 
 // sign 生成签名
-func (c *LinearOrderClient) sign(timestamp, message string) string {
-	h := hmac.New(sha256.New, []byte(c.apiSecret))
+func (c *FuturesOrderClient) sign(timestamp, message string) string {
+	h := hmac.New(sha256.New, []byte(c.ApiSecret))
 	h.Write([]byte(timestamp + message))
 	return hex.EncodeToString(h.Sum(nil))
 }

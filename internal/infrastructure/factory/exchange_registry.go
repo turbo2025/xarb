@@ -2,9 +2,8 @@ package factory
 
 import (
 	"fmt"
-	"net/http"
-	"time"
 
+	"xarb/internal/infrastructure/config"
 	"xarb/internal/infrastructure/exchange/binance"
 	"xarb/internal/infrastructure/exchange/bybit"
 )
@@ -40,9 +39,9 @@ type BybitSpotClients struct {
 
 // BybitFuturesClients Bybit 期货客户端集合
 type BybitFuturesClients struct {
-	Order    *bybit.LinearOrderClient
-	Position *bybit.LinearPositionClient
-	Account  *bybit.LinearAccountClient
+	Order    *bybit.FuturesOrderClient
+	Position *bybit.FuturesPositionClient
+	Account  *bybit.FuturesAccountClient
 }
 
 // ============================================
@@ -63,39 +62,38 @@ func NewExchangeClientRegistry() *ExchangeClientRegistry {
 }
 
 // Register 通用注册方法，根据交易所名称动态注册
-func (r *ExchangeClientRegistry) Register(exchangeName, apiKey, apiSecret, futuresURL, spotURL string) error {
+func (r *ExchangeClientRegistry) Register(exchangeName string, cfg config.ExchangeConfig) error {
 	// 验证参数
-	if apiKey == "" || apiSecret == "" {
-		return fmt.Errorf("binance: apiKey and apiSecret cannot be empty")
+	if cfg.APIKey == "" || cfg.SecretKey == "" {
+		return fmt.Errorf("%s: apiKey and apiSecret cannot be empty", exchangeName)
 	}
-	if futuresURL == "" || spotURL == "" {
-		return fmt.Errorf("binance: futuresURL and spotURL cannot be empty")
+	if cfg.FuturesURL == "" || cfg.SpotURL == "" {
+		return fmt.Errorf("%s: futuresURL and spotURL cannot be empty", exchangeName)
 	}
 	switch exchangeName {
 	case ExchangeBinance:
-		return r.RegisterBinance(apiKey, apiSecret, futuresURL, spotURL)
+		return r.RegisterBinance(cfg)
 	case ExchangeBybit:
-		return r.RegisterBybit(apiKey, apiSecret, futuresURL, spotURL)
+		return r.RegisterBybit(cfg)
 	default:
 		return fmt.Errorf("unknown exchange: %s", exchangeName)
 	}
 }
 
 // RegisterBinance 注册 Binance 业务集合
-func (r *ExchangeClientRegistry) RegisterBinance(apiKey, apiSecret, futuresURL, spotURL string) error {
+func (r *ExchangeClientRegistry) RegisterBinance(cfg config.ExchangeConfig) error {
 
 	// 检查是否已注册
 	if r.binanceSpot != nil || r.binanceFutures != nil {
 		return fmt.Errorf("binance: already registered")
 	}
-	// 为该交易所创建共享的 HTTP 连接池
-	httpClient := &http.Client{
-		Timeout: 10 * time.Second,
-	}
 
-	// 创建两个 Manager（共享 httpClient 和凭证）
-	spotMgr := binance.NewSpotManager(apiKey, apiSecret, spotURL, httpClient)
-	futuresMgr := binance.NewFuturesManager(apiKey, apiSecret, futuresURL, httpClient)
+	// 创建 Manager 配置（自动初始化 HTTP 连接、凭证和 URL）
+	config := binance.NewManagerConfig(cfg)
+
+	// 创建两个 Manager
+	spotMgr := binance.NewSpotManager(config)
+	futuresMgr := binance.NewFuturesManager(config)
 
 	// 组装成强类型的客户端集合
 	r.binanceSpot = &BinanceSpotClients{
@@ -114,20 +112,20 @@ func (r *ExchangeClientRegistry) RegisterBinance(apiKey, apiSecret, futuresURL, 
 }
 
 // RegisterBybit 注册 Bybit 业务集合
-func (r *ExchangeClientRegistry) RegisterBybit(apiKey, apiSecret, futuresURL, spotURL string) error {
+func (r *ExchangeClientRegistry) RegisterBybit(cfg config.ExchangeConfig) error {
 	// 检查是否已注册
 	if r.bybitSpot != nil || r.bybitFutures != nil {
 		return fmt.Errorf("bybit: already registered")
 	}
 
-	// 为该交易所创建共享的 HTTP 连接池
-	httpClient := &http.Client{
-		Timeout: 10 * time.Second,
-	}
+	// 创建 Manager 配置（自动初始化 HTTP 连接、凭证和 URL）
+	config := bybit.NewManagerConfig(cfg)
 
-	linearMgr := bybit.NewLinearManager(apiKey, apiSecret, futuresURL, httpClient)
-	spotMgr := bybit.NewSpotManager(apiKey, apiSecret, spotURL, httpClient)
+	// 创建两个 Manager
+	spotMgr := bybit.NewSpotManager(config)
+	futuresMgr := bybit.NewFuturesManager(config)
 
+	// 组装成强类型的客户端集合
 	r.bybitSpot = &BybitSpotClients{
 		Order:    spotMgr.Order,
 		Position: spotMgr.Position,
@@ -135,9 +133,9 @@ func (r *ExchangeClientRegistry) RegisterBybit(apiKey, apiSecret, futuresURL, sp
 	}
 
 	r.bybitFutures = &BybitFuturesClients{
-		Order:    linearMgr.Order,
-		Position: linearMgr.Position,
-		Account:  linearMgr.Account,
+		Order:    futuresMgr.Order,
+		Position: futuresMgr.Position,
+		Account:  futuresMgr.Account,
 	}
 
 	return nil

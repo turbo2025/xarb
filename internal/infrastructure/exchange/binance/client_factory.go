@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
+	"time"
+	"xarb/internal/infrastructure/config"
 )
 
 // ===== Credentials 凭证 =====
@@ -35,6 +37,28 @@ func (c *Credentials) APIKey() string {
 	return c.apiKey
 }
 
+// ManagerConfig Binance Manager 配置（集中管理 HTTP 连接、凭证和 URL）
+type ManagerConfig struct {
+	credentials *Credentials
+	httpClient  *http.Client
+	SpotURL     string
+	FuturesURL  string
+}
+
+// NewManagerConfig 创建 Binance Manager 配置（自动初始化 HTTP 连接）
+func NewManagerConfig(cfg config.ExchangeConfig) *ManagerConfig {
+	httpClient := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	credentials := NewCredentials(cfg.APIKey, cfg.SecretKey)
+	return &ManagerConfig{
+		credentials: credentials,
+		httpClient:  httpClient,
+		SpotURL:     cfg.SpotURL,
+		FuturesURL:  cfg.FuturesURL,
+	}
+}
+
 // ===== Manager 结构 =====
 
 // ===== Manager 结构 =====
@@ -46,24 +70,23 @@ type FuturesManager struct {
 	Position *FuturesPositionClient
 }
 
-// NewFuturesManager 创建 Binance 期货管理器（凭证在此初始化一次）
-func NewFuturesManager(apiKey, apiSecret, baseURL string, httpClient *http.Client) *FuturesManager {
-	credentials := NewCredentials(apiKey, apiSecret)
+// NewFuturesManager 创建 Binance 期货管理器（从 Manager 配置中读取参数）
+func NewFuturesManager(cfg *ManagerConfig) *FuturesManager {
 	return &FuturesManager{
 		Order: &FuturesOrderClient{
-			credentials: credentials,
-			httpClient:  httpClient,
-			baseURL:     baseURL,
+			credentials: cfg.credentials,
+			httpClient:  cfg.httpClient,
+			baseURL:     cfg.FuturesURL,
 		},
 		Account: &FuturesAccountClient{
-			credentials: credentials,
-			httpClient:  httpClient,
-			baseURL:     baseURL,
+			credentials: cfg.credentials,
+			httpClient:  cfg.httpClient,
+			baseURL:     cfg.FuturesURL,
 		},
 		Position: &FuturesPositionClient{
-			credentials: credentials,
-			httpClient:  httpClient,
-			baseURL:     baseURL,
+			credentials: cfg.credentials,
+			httpClient:  cfg.httpClient,
+			baseURL:     cfg.FuturesURL,
 		},
 	}
 }
@@ -75,24 +98,23 @@ type SpotManager struct {
 	Position *SpotPositionClient
 }
 
-// NewSpotManager 创建 Binance 现货管理器（凭证在此初始化一次）
-func NewSpotManager(apiKey, apiSecret, baseURL string, httpClient *http.Client) *SpotManager {
-	credentials := NewCredentials(apiKey, apiSecret)
+// NewSpotManager 创建 Binance 现货管理器（从 Manager 配置中读取参数）
+func NewSpotManager(cfg *ManagerConfig) *SpotManager {
 	return &SpotManager{
 		Order: &SpotOrderClient{
-			credentials: credentials,
-			httpClient:  httpClient,
-			baseURL:     baseURL,
+			credentials: cfg.credentials,
+			httpClient:  cfg.httpClient,
+			baseURL:     cfg.SpotURL,
 		},
 		Account: &SpotAccountClient{
-			credentials: credentials,
-			httpClient:  httpClient,
-			baseURL:     baseURL,
+			credentials: cfg.credentials,
+			httpClient:  cfg.httpClient,
+			baseURL:     cfg.SpotURL,
 		},
 		Position: &SpotPositionClient{
-			credentials: credentials,
-			httpClient:  httpClient,
-			baseURL:     baseURL,
+			credentials: cfg.credentials,
+			httpClient:  cfg.httpClient,
+			baseURL:     cfg.SpotURL,
 		},
 	}
 }

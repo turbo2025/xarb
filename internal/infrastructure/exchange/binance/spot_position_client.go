@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"xarb/internal/domain/service"
 )
@@ -14,15 +13,6 @@ type SpotPositionClient struct {
 	credentials *Credentials
 	httpClient  *http.Client
 	baseURL     string
-}
-
-// NewSpotPositionClient 创建 Binance 现货持仓客户端
-func NewSpotPositionClient(apiKey, apiSecret string) *SpotPositionClient {
-	return &SpotPositionClient{
-		credentials: NewCredentials(apiKey, apiSecret),
-		httpClient:  &http.Client{Timeout: 10 * time.Second},
-		baseURL:     "https://api.binance.com",
-	}
 }
 
 // GetBalances 获取所有币种余额（钱包）

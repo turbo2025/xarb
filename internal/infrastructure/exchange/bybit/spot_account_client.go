@@ -3,26 +3,13 @@ package bybit
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"time"
 
 	"xarb/internal/domain/service"
 )
 
 // SpotAccountClient Bybit 现货账户查询客户端
 type SpotAccountClient struct {
-	*clientFields
-}
-
-// NewSpotAccountClient 创建 Bybit 现货账户客户端
-func NewSpotAccountClient(apiKey, apiSecret string) *SpotAccountClient {
-	return &SpotAccountClient{
-		clientFields: &clientFields{
-			apiKey:     apiKey,
-			apiSecret:  apiSecret,
-			httpClient: &http.Client{Timeout: 10 * time.Second},
-		},
-	}
+	*ClientFields
 }
 
 // spotAccountResponse 现货账户响应结构

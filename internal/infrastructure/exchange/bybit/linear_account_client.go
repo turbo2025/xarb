@@ -3,26 +3,13 @@ package bybit
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"time"
 
 	"xarb/internal/domain/service"
 )
 
-// LinearAccountClient Bybit 永续合约账户查询客户端
-type LinearAccountClient struct {
-	*clientFields
-}
-
-// NewLinearAccountClient 创建 Bybit 永续合约账户客户端
-func NewLinearAccountClient(apiKey, apiSecret string) *LinearAccountClient {
-	return &LinearAccountClient{
-		clientFields: &clientFields{
-			apiKey:     apiKey,
-			apiSecret:  apiSecret,
-			httpClient: &http.Client{Timeout: 10 * time.Second},
-		},
-	}
+// FuturesAccountClient Bybit 期货账户查询客户端
+type FuturesAccountClient struct {
+	*ClientFields
 }
 
 // accountResponse API 响应结构
@@ -149,31 +136,31 @@ type orderHistoryResponse struct {
 }
 
 // GetAccount 获取账户信息
-func (c *LinearAccountClient) GetAccount(ctx context.Context) (*service.AccountInfo, error) {
+func (c *FuturesAccountClient) GetAccount(ctx context.Context) (*service.AccountInfo, error) {
 	// TODO: 实现 GET /v5/account/wallet-balance
 	return nil, fmt.Errorf("not implemented")
 }
 
 // GetPositions 获取持仓
-func (c *LinearAccountClient) GetPositions(ctx context.Context) ([]*service.PositionInfo, error) {
+func (c *FuturesAccountClient) GetPositions(ctx context.Context) ([]*service.PositionInfo, error) {
 	// TODO: 实现 GET /v5/position/list
 	return nil, fmt.Errorf("not implemented")
 }
 
 // GetOpenOrders 获取挂单
-func (c *LinearAccountClient) GetOpenOrders(ctx context.Context, symbol string) ([]*service.OpenOrderInfo, error) {
+func (c *FuturesAccountClient) GetOpenOrders(ctx context.Context, symbol string) ([]*service.OpenOrderInfo, error) {
 	// TODO: 实现 GET /v5/order/realtime
 	return nil, fmt.Errorf("not implemented")
 }
 
 // GetOrderHistory 获取订单历史
-func (c *LinearAccountClient) GetOrderHistory(ctx context.Context, symbol string, limit int) ([]*service.OrderLog, error) {
+func (c *FuturesAccountClient) GetOrderHistory(ctx context.Context, symbol string, limit int) ([]*service.OrderLog, error) {
 	// TODO: 实现 GET /v5/order/history
 	return nil, fmt.Errorf("not implemented")
 }
 
 // GetBalance 获取余额
-func (c *LinearAccountClient) GetBalance(ctx context.Context) (float64, error) {
+func (c *FuturesAccountClient) GetBalance(ctx context.Context) (float64, error) {
 	// TODO: 实现 GET /v5/account/wallet-balance 并提取总余额
 	return 0, fmt.Errorf("not implemented")
 }

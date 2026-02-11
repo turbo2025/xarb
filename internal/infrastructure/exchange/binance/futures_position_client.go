@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"xarb/internal/domain/service"
 )
@@ -14,15 +13,6 @@ type FuturesPositionClient struct {
 	credentials *Credentials
 	httpClient  *http.Client
 	baseURL     string
-}
-
-// NewFuturesPositionClient 创建 Binance 期货持仓客户端
-func NewFuturesPositionClient(apiKey, apiSecret string) *FuturesPositionClient {
-	return &FuturesPositionClient{
-		credentials: NewCredentials(apiKey, apiSecret),
-		httpClient:  &http.Client{Timeout: 10 * time.Second},
-		baseURL:     "https://fapi.binance.com",
-	}
 }
 
 // GetPositions 获取期货持仓

@@ -20,15 +20,6 @@ type FuturesOrderClient struct {
 	baseURL     string
 }
 
-// NewFuturesOrderClient 创建 Binance 期货客户端
-func NewFuturesOrderClient(apiKey, secretKey string) *FuturesOrderClient {
-	return &FuturesOrderClient{
-		credentials: NewCredentials(apiKey, secretKey),
-		httpClient:  &http.Client{Timeout: time.Second * 30},
-		baseURL:     "https://fapi.binance.com",
-	}
-}
-
 // PlaceOrder 下单
 // side: "BUY" 或 "SELL"
 // quantity: 交易数量

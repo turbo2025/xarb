@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"xarb/internal/domain/service"
 )
@@ -14,15 +13,6 @@ type SpotAccountClient struct {
 	credentials *Credentials
 	httpClient  *http.Client
 	baseURL     string
-}
-
-// NewSpotAccountClient 创建 Binance 现货账户客户端
-func NewSpotAccountClient(apiKey, apiSecret string) *SpotAccountClient {
-	return &SpotAccountClient{
-		credentials: NewCredentials(apiKey, apiSecret),
-		httpClient:  &http.Client{Timeout: 10 * time.Second},
-		baseURL:     "https://api.binance.com",
-	}
 }
 
 // spotAccountResponse 现货账户响应结构

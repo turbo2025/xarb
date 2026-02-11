@@ -2,32 +2,69 @@ package bybit
 
 import (
 	"net/http"
+	"time"
+	"xarb/internal/infrastructure/config"
 )
 
-// clientFields 共享客户端字段
-type clientFields struct {
-	apiKey     string
-	apiSecret  string
-	httpClient *http.Client
-	baseURL    string
+// ClientFields 共享客户端字段
+type ClientFields struct {
+	ApiKey     string
+	ApiSecret  string
+	HttpClient *http.Client
+	BaseURL    string
+}
+
+// NewClientFields 创建共享的客户端字段
+func NewClientFields(apiKey, apiSecret string, httpClient *http.Client) *ClientFields {
+	return &ClientFields{
+		ApiKey:     apiKey,
+		ApiSecret:  apiSecret,
+		HttpClient: httpClient,
+	}
+}
+
+// ManagerConfig Bybit Manager 配置（集中管理 HTTP 连接、凭证和 URL）
+type ManagerConfig struct {
+	fields     *ClientFields
+	SpotURL    string
+	FuturesURL string
+}
+
+// NewManagerConfig 创建 Bybit Manager 配置（自动初始化 HTTP 连接）
+func NewManagerConfig(cfg config.ExchangeConfig) *ManagerConfig {
+	httpClient := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	fields := NewClientFields(cfg.APIKey, cfg.SecretKey, httpClient)
+	return &ManagerConfig{
+		fields:     fields,
+		SpotURL:    cfg.SpotURL,
+		FuturesURL: cfg.FuturesURL,
+	}
 }
 
 // ===== Manager 结构 =====
 
-// LinearManager Bybit 线性期货（perpetual）统一管理器
-type LinearManager struct {
-	Order    *LinearOrderClient
-	Account  *LinearAccountClient
-	Position *LinearPositionClient
+// FuturesManager Bybit 期货（perpetual）统一管理器
+type FuturesManager struct {
+	Order    *FuturesOrderClient
+	Account  *FuturesAccountClient
+	Position *FuturesPositionClient
 }
 
-// NewLinearManager 创建 Bybit 线性期货管理器
-func NewLinearManager(apiKey, apiSecret, baseURL string, httpClient *http.Client) *LinearManager {
-	client := NewLinearClient(apiKey, apiSecret, baseURL, httpClient)
-	return &LinearManager{
-		Order:    client.OrderClient(),
-		Account:  client.AccountClient(),
-		Position: client.PositionClient(),
+// NewFuturesManager 创建 Bybit 期货管理器（从 Manager 配置中读取 URL）
+func NewFuturesManager(cfg *ManagerConfig) *FuturesManager {
+	return &FuturesManager{
+		Order: &FuturesOrderClient{
+			ClientFields: cfg.fields,
+			baseURL:      cfg.FuturesURL,
+		},
+		Account: &FuturesAccountClient{
+			ClientFields: cfg.fields,
+		},
+		Position: &FuturesPositionClient{
+			ClientFields: cfg.fields,
+		},
 	}
 }
 
@@ -38,84 +75,20 @@ type SpotManager struct {
 	Position *SpotPositionClient
 }
 
-// NewSpotManager 创建 Bybit 现货管理器
-func NewSpotManager(apiKey, apiSecret, baseURL string, httpClient *http.Client) *SpotManager {
-	client := NewSpotClient(apiKey, apiSecret, baseURL, httpClient)
+// NewSpotManager 创建 Bybit 现货管理器（从 Manager 配置中读取 URL）
+func NewSpotManager(cfg *ManagerConfig) *SpotManager {
 	return &SpotManager{
-		Order:    client.OrderClient(),
-		Account:  client.AccountClient(),
-		Position: client.PositionClient(),
-	}
-}
-
-// ===== 内部工厂函数 =====
-
-// LinearClient Bybit 线性期货（perpetual）统一客户端
-type LinearClient struct {
-	fields *clientFields
-}
-
-// NewLinearClient 创建 Bybit 线性期货客户端工厂
-func NewLinearClient(apiKey, apiSecret, baseURL string, httpClient *http.Client) *LinearClient {
-	return &LinearClient{
-		fields: &clientFields{
-			apiKey:     apiKey,
-			apiSecret:  apiSecret,
-			httpClient: httpClient,
-			baseURL:    baseURL,
+		Order: &SpotOrderClient{
+			ClientFields: cfg.fields,
+			baseURL:      cfg.SpotURL,
+		},
+		Account: &SpotAccountClient{
+			ClientFields: cfg.fields,
+		},
+		Position: &SpotPositionClient{
+			ClientFields: cfg.fields,
 		},
 	}
 }
 
-// AccountClient 返回账户查询客户端
-func (l *LinearClient) AccountClient() *LinearAccountClient {
-	return &LinearAccountClient{l.fields}
-}
-
-// OrderClient 返回订单客户端
-func (l *LinearClient) OrderClient() *LinearOrderClient {
-	return &LinearOrderClient{
-		clientFields: l.fields,
-		baseURL:      l.fields.baseURL,
-	}
-}
-
-// PositionClient 返回持仓查询客户端
-func (l *LinearClient) PositionClient() *LinearPositionClient {
-	return &LinearPositionClient{l.fields}
-}
-
-// SpotClient Bybit 现货统一客户端
-type SpotClient struct {
-	fields *clientFields
-}
-
-// NewSpotClient 创建 Bybit 现货客户端工厂
-func NewSpotClient(apiKey, apiSecret, baseURL string, httpClient *http.Client) *SpotClient {
-	return &SpotClient{
-		fields: &clientFields{
-			apiKey:     apiKey,
-			apiSecret:  apiSecret,
-			httpClient: httpClient,
-			baseURL:    baseURL,
-		},
-	}
-}
-
-// AccountClient 返回账户查询客户端
-func (s *SpotClient) AccountClient() *SpotAccountClient {
-	return &SpotAccountClient{s.fields}
-}
-
-// OrderClient 返回订单客户端
-func (s *SpotClient) OrderClient() *SpotOrderClient {
-	return &SpotOrderClient{
-		clientFields: s.fields,
-		baseURL:      s.fields.baseURL,
-	}
-}
-
-// PositionClient 返回持仓查询客户端
-func (s *SpotClient) PositionClient() *SpotPositionClient {
-	return &SpotPositionClient{s.fields}
-}
+// ===== 别名和辅助函数 =====

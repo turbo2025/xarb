@@ -56,10 +56,10 @@ func (a *binanceOrderClientAdapter) GetFundingRate(ctx context.Context, symbol s
 // ============================================
 
 type bybitOrderClientAdapter struct {
-	client *bybit.LinearOrderClient
+	client *bybit.FuturesOrderClient
 }
 
-func NewBybitOrderAdapter(client *bybit.LinearOrderClient) domainservice.OrderClient {
+func NewBybitOrderAdapter(client *bybit.FuturesOrderClient) domainservice.OrderClient {
 	return &bybitOrderClientAdapter{client: client}
 }
 

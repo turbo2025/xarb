@@ -3,26 +3,13 @@ package bybit
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"time"
 
 	"xarb/internal/domain/service"
 )
 
 // SpotPositionClient Bybit 现货持仓（钱包）客户端
 type SpotPositionClient struct {
-	*clientFields
-}
-
-// NewSpotPositionClient 创建 Bybit 现货持仓客户端
-func NewSpotPositionClient(apiKey, apiSecret string) *SpotPositionClient {
-	return &SpotPositionClient{
-		clientFields: &clientFields{
-			apiKey:     apiKey,
-			apiSecret:  apiSecret,
-			httpClient: &http.Client{Timeout: 10 * time.Second},
-		},
-	}
+	*ClientFields
 }
 
 // GetBalances 获取所有币种余额（钱包）

@@ -3,26 +3,12 @@ package bybit
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"time"
 )
 
 // SpotOrderClient Bybit 现货订单客户端
 type SpotOrderClient struct {
-	*clientFields
+	*ClientFields
 	baseURL string
-}
-
-// NewSpotOrderClient 创建 Bybit 现货订单客户端
-func NewSpotOrderClient(apiKey, apiSecret string) *SpotOrderClient {
-	return &SpotOrderClient{
-		clientFields: &clientFields{
-			apiKey:     apiKey,
-			apiSecret:  apiSecret,
-			httpClient: &http.Client{Timeout: 10 * time.Second},
-		},
-		baseURL: "https://api.bybit.com",
-	}
 }
 
 // PlaceOrder 下单

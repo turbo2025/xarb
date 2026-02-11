@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"xarb/internal/domain/service"
 )
@@ -14,14 +13,6 @@ type FuturesAccountClient struct {
 	credentials *Credentials
 	httpClient  *http.Client
 	baseURL     string
-}
-
-// NewFuturesAccountClient 创建 Binance 期货账户客户端
-func NewFuturesAccountClient(apiKey, apiSecret string) *FuturesAccountClient {
-	return &FuturesAccountClient{
-		credentials: NewCredentials(apiKey, apiSecret),
-		httpClient:  &http.Client{Timeout: 10 * time.Second},
-	}
 }
 
 // accountResponse API 响应结构
