@@ -3,16 +3,18 @@ package binance
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"xarb/internal/domain/service"
 )
 
 // FuturesPositionClient Binance 期货持仓客户端
 type FuturesPositionClient struct {
-	credentials *Credentials
-	httpClient  *http.Client
-	baseURL     string
+	*APIClient
+}
+
+// NewFuturesPositionClient 创建期货持仓客户端
+func NewFuturesPositionClient(client *APIClient) *FuturesPositionClient {
+	return &FuturesPositionClient{APIClient: client}
 }
 
 // GetPositions 获取期货持仓

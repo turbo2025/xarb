@@ -27,6 +27,8 @@ type ServiceContext struct {
 
 	// 配置
 	Config *config.Config
+	// 交易所客户端
+	apiClients *factory.APIClients
 
 	// 输出端口
 	Sink port.Sink
@@ -53,12 +55,22 @@ type ServiceContext struct {
 
 // New 创建并初始化 ServiceContext
 // 这是应用启动的唯一入口点，所有依赖初始化都在这里完成
-func New(ctx context.Context, cfg *config.Config) (*ServiceContext, error) {
+func New(ctx context.Context, cfg *config.Config, apiClients *factory.APIClients) (*ServiceContext, error) {
 	sc := &ServiceContext{
 		Ctx:         ctx,
 		Config:      cfg,
 		Sink:        console.NewSink(),
+		apiClients:  apiClients,
 		closerChain: make([]func() error, 0),
+	}
+
+	// 如果未传入 API 客户端，则在这里初始化一次
+	if sc.apiClients == nil {
+		clients, err := factory.NewAPIClients(sc.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize api clients: %w", err)
+		}
+		sc.apiClients = clients
 	}
 
 	// 初始化所有组件，按依赖顺序
@@ -90,25 +102,22 @@ func (sc *ServiceContext) initializeComponents() error {
 		log.Warn().Err(err).Msg("failed to load default symbol mapping")
 	}
 
-	// 3. 初始化交易所客户端（自动注册 enabled=true 的交易所）
-	apiClients, err := factory.NewAPIClients(sc.Config)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to initialize API clients")
-		return err
+	if sc.apiClients == nil {
+		return fmt.Errorf("api clients not initialized")
 	}
 
 	// 4. 初始化业务组件
 	sc.arbitrageExecutor = domainservice.NewArbitrageExecutor()
 
 	// 5. 从 ExchangeRegistry 构建所需的 Manager
-	futuresOrderMgr, err := buildFuturesOrderManager(apiClients)
+	futuresOrderMgr, err := buildFuturesOrderManager(sc.apiClients)
 	if err != nil {
 		log.Warn().Err(err).Msg("failed to build futures order manager")
 	} else {
 		sc.futuresOrderManager = futuresOrderMgr
 	}
 
-	spotOrderMgr, err := buildSpotOrderManager(apiClients)
+	spotOrderMgr, err := buildSpotOrderManager(sc.apiClients)
 	if err != nil {
 		log.Warn().Err(err).Msg("failed to build spot order manager")
 	} else {

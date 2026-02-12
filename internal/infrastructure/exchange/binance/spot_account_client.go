@@ -2,17 +2,26 @@ package binance
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
 
 	"xarb/internal/domain/service"
 )
 
 // SpotAccountClient Binance 现货账户查询客户端
 type SpotAccountClient struct {
-	credentials *Credentials
-	httpClient  *http.Client
-	baseURL     string
+	*APIClient
+}
+
+// NewSpotAccountClient 创建现货账户客户端
+func NewSpotAccountClient(client *APIClient) *SpotAccountClient {
+	return &SpotAccountClient{APIClient: client}
 }
 
 // spotAccountResponse 现货账户响应结构
@@ -39,27 +48,156 @@ func (c *SpotAccountClient) GetAccount(ctx context.Context) (*service.AccountInf
 	return nil, fmt.Errorf("not implemented")
 }
 
-// GetPositions 获取现货持仓（实际是代币余额）
-func (c *SpotAccountClient) GetPositions(ctx context.Context) ([]*service.PositionInfo, error) {
-	// TODO: 实现 GET /api/v3/account 并返回非零余额作为 "持仓"
-	// 现货没有真正的持仓概念，只有钱包余额
-	return nil, fmt.Errorf("not implemented")
-}
-
-// GetOpenOrders 获取现货挂单
-func (c *SpotAccountClient) GetOpenOrders(ctx context.Context, symbol string) ([]*service.OpenOrderInfo, error) {
-	// TODO: 实现 GET /api/v3/openOrders?symbol=BTCUSDT
-	return nil, fmt.Errorf("not implemented")
-}
-
-// GetOrderHistory 获取现货订单历史
-func (c *SpotAccountClient) GetOrderHistory(ctx context.Context, symbol string, limit int) ([]*service.OrderLog, error) {
-	// TODO: 实现 GET /api/v3/allOrders?symbol=BTCUSDT&limit=100
-	return nil, fmt.Errorf("not implemented")
-}
-
-// GetBalance 获取现货总余额
+// GetBalance 获取现货账户总余额
 func (c *SpotAccountClient) GetBalance(ctx context.Context) (float64, error) {
-	// TODO: 实现 GET /api/v3/account 并计算总 USDT 价值
-	return 0, fmt.Errorf("not implemented")
+	resp, err := c.fetchSpotAccount(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	priceCache := make(map[string]float64)
+	var totalUSDT float64
+
+	for _, balance := range resp.Balances {
+		free, err := strconv.ParseFloat(balance.Free, 64)
+		if err != nil {
+			return 0, fmt.Errorf("parse free balance for %s: %w", balance.Asset, err)
+		}
+		locked, err := strconv.ParseFloat(balance.Locked, 64)
+		if err != nil {
+			return 0, fmt.Errorf("parse locked balance for %s: %w", balance.Asset, err)
+		}
+
+		amount := free + locked
+		if amount <= 0 {
+			continue
+		}
+
+		value, err := c.assetToUSDT(ctx, balance.Asset, amount, priceCache)
+		if err != nil {
+			return 0, err
+		}
+		totalUSDT += value
+	}
+
+	return totalUSDT, nil
+}
+
+// fetchSpotAccount 调用 Binance 现货账户接口
+func (c *SpotAccountClient) fetchSpotAccount(ctx context.Context) (*spotAccountResponse, error) {
+	body, err := c.signedRequest(ctx, http.MethodGet, "/api/v3/account", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp spotAccountResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("decode account response failed: %w", err)
+	}
+	return &resp, nil
+}
+
+// assetToUSDT 将任意资产换算为 USDT
+func (c *SpotAccountClient) assetToUSDT(ctx context.Context, asset string, amount float64, cache map[string]float64) (float64, error) {
+	asset = strings.ToUpper(asset)
+	if amount == 0 {
+		return 0, nil
+	}
+
+	if isUSDStableCoin(asset) {
+		return amount, nil
+	}
+
+	symbol := asset + "USDT"
+	if price, ok := cache[symbol]; ok {
+		return amount * price, nil
+	}
+
+	price, err := c.fetchTickerPrice(ctx, symbol)
+	if err != nil {
+		return 0, fmt.Errorf("get ticker %s failed: %w", symbol, err)
+	}
+	cache[symbol] = price
+	return amount * price, nil
+}
+
+// fetchTickerPrice 获取现货 ticker 价格
+func (c *SpotAccountClient) fetchTickerPrice(ctx context.Context, symbol string) (float64, error) {
+	endpoint := fmt.Sprintf("%s/api/v3/ticker/price?symbol=%s", strings.TrimRight(c.baseURL, "/"), url.QueryEscape(symbol))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return 0, fmt.Errorf("ticker http %d: %s", resp.StatusCode, string(body))
+	}
+
+	var data struct {
+		Price string `json:"price"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return 0, fmt.Errorf("decode ticker failed: %w", err)
+	}
+
+	price, err := strconv.ParseFloat(data.Price, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse ticker price failed: %w", err)
+	}
+	return price, nil
+}
+
+// signedRequest 发送需要签名的请求
+func (c *SpotAccountClient) signedRequest(ctx context.Context, method, path string, params url.Values) ([]byte, error) {
+	if params == nil {
+		params = url.Values{}
+	}
+	params.Set("timestamp", strconv.FormatInt(time.Now().UnixMilli(), 10))
+	if params.Get("recvWindow") == "" {
+		params.Set("recvWindow", "5000")
+	}
+
+	query := params.Encode()
+	signature := c.credentials.Sign(query)
+	reqURL := fmt.Sprintf("%s%s?%s&signature=%s", strings.TrimRight(c.baseURL, "/"), path, query, signature)
+
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-MBX-APIKEY", c.credentials.APIKey())
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("account http %d: %s", resp.StatusCode, string(body))
+	}
+
+	return body, nil
+}
+
+func isUSDStableCoin(asset string) bool {
+	switch asset {
+	case "USDT", "USDC", "BUSD", "FDUSD", "TUSD", "DAI", "USDD":
+		return true
+	default:
+		return false
+	}
 }

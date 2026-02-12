@@ -15,9 +15,12 @@ import (
 
 // FuturesOrderClient Binance 期货 REST 客户端
 type FuturesOrderClient struct {
-	credentials *Credentials
-	httpClient  *http.Client
-	baseURL     string
+	*APIClient
+}
+
+// NewFuturesOrderClient 创建期货订单客户端
+func NewFuturesOrderClient(client *APIClient) *FuturesOrderClient {
+	return &FuturesOrderClient{APIClient: client}
 }
 
 // PlaceOrder 下单
@@ -155,6 +158,18 @@ func (c *FuturesOrderClient) GetFundingRate(ctx context.Context, symbol string) 
 
 	rate, _ := strconv.ParseFloat(resp.FundingRate, 64)
 	return rate, nil
+}
+
+// GetOpenOrders 获取挂单
+func (c *FuturesOrderClient) GetOpenOrders(ctx context.Context, symbol string) ([]*OrderStatus, error) {
+	// TODO: 实现 GET /fapi/v1/openOrders
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetOrderHistory 获取订单历史
+func (c *FuturesOrderClient) GetOrderHistory(ctx context.Context, symbol string, limit int) ([]*OrderStatus, error) {
+	// TODO: 实现 GET /fapi/v1/allOrders
+	return nil, fmt.Errorf("not implemented")
 }
 
 // GetAccount 查询账户信息
@@ -396,4 +411,59 @@ type OrderStatus struct {
 	Status           string
 	CreatedAt        int64
 	UpdatedAt        int64
+}
+
+// OpenOrderResponse 挂单响应
+type OpenOrderResponse struct {
+	OrderID          int64  `json:"orderId"`
+	Symbol           string `json:"symbol"`
+	Status           string `json:"status"`
+	ClientOrderID    string `json:"clientOrderId"`
+	Price            string `json:"price"`
+	AvgPrice         string `json:"avgPrice"`
+	OrigQuantity     string `json:"origQty"`
+	ExecutedQuantity string `json:"executedQty"`
+	CumQuantity      string `json:"cumQty"`
+	TimeInForce      string `json:"timeInForce"`
+	Type             string `json:"type"`
+	ReduceOnly       bool   `json:"reduceOnly"`
+	Side             string `json:"side"`
+	StopPrice        string `json:"stopPrice"`
+	Time             int64  `json:"time"`
+	UpdateTime       int64  `json:"updateTime"`
+	ActivatePrice    string `json:"activatePrice"`
+	PriceRate        string `json:"priceRate"`
+	CloseTime        int64  `json:"closeTime,omitempty"`
+	WorkingType      string `json:"workingType"`
+	OrigType         string `json:"origType"`
+	PositionSide     string `json:"positionSide"`
+	GoodTillDate     int64  `json:"goodTillDate"`
+	CumBase          string `json:"cumBase"`
+}
+
+// OrderHistoryResponse 订单历史响应
+type OrderHistoryResponse struct {
+	OrderID          int64  `json:"orderId"`
+	Symbol           string `json:"symbol"`
+	Status           string `json:"status"`
+	ClientOrderID    string `json:"clientOrderId"`
+	Price            string `json:"price"`
+	AvgPrice         string `json:"avgPrice"`
+	OrigQuantity     string `json:"origQty"`
+	ExecutedQuantity string `json:"executedQty"`
+	CumQuantity      string `json:"cumQty"`
+	TimeInForce      string `json:"timeInForce"`
+	Type             string `json:"type"`
+	Side             string `json:"side"`
+	StopPrice        string `json:"stopPrice"`
+	Time             int64  `json:"time"`
+	UpdateTime       int64  `json:"updateTime"`
+	CloseTime        int64  `json:"closeTime,omitempty"`
+	WorkingType      string `json:"workingType"`
+	OrigType         string `json:"origType"`
+	PositionSide     string `json:"positionSide"`
+	Commission       string `json:"commission,omitempty"`
+	CommissionAsset  string `json:"commissionAsset,omitempty"`
+	CumBase          string `json:"cumBase"`
+	RealizedProfit   string `json:"realizedProfit,omitempty"`
 }

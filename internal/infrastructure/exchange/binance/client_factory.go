@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"net/http"
 	"time"
-	"xarb/internal/infrastructure/config"
 )
 
 // ===== Credentials 凭证 =====
@@ -37,31 +36,34 @@ func (c *Credentials) APIKey() string {
 	return c.apiKey
 }
 
-// ManagerConfig Binance Manager 配置（集中管理 HTTP 连接、凭证和 URL）
-type ManagerConfig struct {
+type APIClient struct {
 	credentials *Credentials
 	httpClient  *http.Client
-	SpotURL     string
-	FuturesURL  string
+	baseURL     string
 }
 
-// NewManagerConfig 创建 Binance Manager 配置（自动初始化 HTTP 连接）
-func NewManagerConfig(cfg config.ExchangeConfig) *ManagerConfig {
-	httpClient := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-	credentials := NewCredentials(cfg.APIKey, cfg.SecretKey)
-	return &ManagerConfig{
-		credentials: credentials,
-		httpClient:  httpClient,
-		SpotURL:     cfg.SpotURL,
-		FuturesURL:  cfg.FuturesURL,
+// managerDeps 在内部复用 HTTP 连接与凭证
+type managerDeps struct {
+	credentials *Credentials
+	httpClient  *http.Client
+}
+
+func newManagerDeps(apiKey, apiSecret string) *managerDeps {
+	return &managerDeps{
+		credentials: NewCredentials(apiKey, apiSecret),
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+		},
 	}
 }
 
-// ===== Manager 结构 =====
-
-// ===== Manager 结构 =====
+func (d *managerDeps) newAPIClient(baseURL string) *APIClient {
+	return &APIClient{
+		credentials: d.credentials,
+		httpClient:  d.httpClient,
+		baseURL:     baseURL,
+	}
+}
 
 // FuturesManager Binance 期货统一管理器
 type FuturesManager struct {
@@ -70,24 +72,12 @@ type FuturesManager struct {
 	Position *FuturesPositionClient
 }
 
-// NewFuturesManager 创建 Binance 期货管理器（从 Manager 配置中读取参数）
-func NewFuturesManager(cfg *ManagerConfig) *FuturesManager {
+func newFuturesManager(deps *managerDeps, futuresURL string) *FuturesManager {
+	apiClient := deps.newAPIClient(futuresURL)
 	return &FuturesManager{
-		Order: &FuturesOrderClient{
-			credentials: cfg.credentials,
-			httpClient:  cfg.httpClient,
-			baseURL:     cfg.FuturesURL,
-		},
-		Account: &FuturesAccountClient{
-			credentials: cfg.credentials,
-			httpClient:  cfg.httpClient,
-			baseURL:     cfg.FuturesURL,
-		},
-		Position: &FuturesPositionClient{
-			credentials: cfg.credentials,
-			httpClient:  cfg.httpClient,
-			baseURL:     cfg.FuturesURL,
-		},
+		Order:    NewFuturesOrderClient(apiClient),
+		Account:  NewFuturesAccountClient(apiClient),
+		Position: NewFuturesPositionClient(apiClient),
 	}
 }
 
@@ -98,23 +88,19 @@ type SpotManager struct {
 	Position *SpotPositionClient
 }
 
-// NewSpotManager 创建 Binance 现货管理器（从 Manager 配置中读取参数）
-func NewSpotManager(cfg *ManagerConfig) *SpotManager {
+func newSpotManager(deps *managerDeps, spotURL string) *SpotManager {
+	apiClient := deps.newAPIClient(spotURL)
 	return &SpotManager{
-		Order: &SpotOrderClient{
-			credentials: cfg.credentials,
-			httpClient:  cfg.httpClient,
-			baseURL:     cfg.SpotURL,
-		},
-		Account: &SpotAccountClient{
-			credentials: cfg.credentials,
-			httpClient:  cfg.httpClient,
-			baseURL:     cfg.SpotURL,
-		},
-		Position: &SpotPositionClient{
-			credentials: cfg.credentials,
-			httpClient:  cfg.httpClient,
-			baseURL:     cfg.SpotURL,
-		},
+		Order:    NewSpotOrderClient(apiClient),
+		Account:  NewSpotAccountClient(apiClient),
+		Position: NewSpotPositionClient(apiClient),
 	}
+}
+
+// NewManagers 通过一组凭证和 URL 同时创建现货与期货管理器
+func NewManagers(apiKey, apiSecret, spotURL, futuresURL string) (*SpotManager, *FuturesManager) {
+	deps := newManagerDeps(apiKey, apiSecret)
+	spotMgr := newSpotManager(deps, spotURL)
+	futuresMgr := newFuturesManager(deps, futuresURL)
+	return spotMgr, futuresMgr
 }

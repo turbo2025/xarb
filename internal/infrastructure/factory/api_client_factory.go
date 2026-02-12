@@ -44,7 +44,7 @@ func registerExchanges(registry *ExchangeClientRegistry, cfg *config.Config) err
 		}
 
 		// 调用通用注册方法
-		if err := registry.Register(exchangeName, exchCfg); err != nil {
+		if err := registry.Register(exchangeName, &exchCfg); err != nil {
 			return fmt.Errorf("failed to register %s: %w", exchangeName, err)
 		}
 

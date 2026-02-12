@@ -25,6 +25,12 @@ build:
 	$(GO) build -o $(BINARY_NAME) $(MAIN_PACKAGE)
 	@echo "Build complete: ./$(BINARY_NAME)"
 
+# Build Linux binary
+build-linux:
+	@echo "Building $(BINARY_NAME) for linux/amd64..."
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -o $(BINARY_NAME)-linux $(MAIN_PACKAGE)
+	@echo "Build complete: ./$(BINARY_NAME)-linux"
+
 # Run the application
 run: build
 	@echo "Running $(BINARY_NAME)..."

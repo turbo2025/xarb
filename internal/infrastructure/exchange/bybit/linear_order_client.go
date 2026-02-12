@@ -19,9 +19,15 @@ import (
 
 // FuturesOrderClient Bybit 期货 REST 客户端 (V5 API)
 type FuturesOrderClient struct {
-	*ClientFields
-	baseURL string
+	*APIClient
 }
+
+// NewFuturesOrderClient 创建期货订单客户端
+func NewFuturesOrderClient(client *APIClient) *FuturesOrderClient {
+	return &FuturesOrderClient{APIClient: client}
+}
+
+// placeLimitOrderRequest 限价单请求结构
 
 // PlaceOrder 下单
 func (c *FuturesOrderClient) PlaceOrder(
@@ -179,6 +185,18 @@ func (c *FuturesOrderClient) GetFundingRate(ctx context.Context, symbol string) 
 	return rate, nil
 }
 
+// GetOpenOrders 获取挂单
+func (c *FuturesOrderClient) GetOpenOrders(ctx context.Context, symbol string) (interface{}, error) {
+	// TODO: 实现 GET /v5/order/realtime?category=linear&symbol=BTCUSDT
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetOrderHistory 获取订单历史
+func (c *FuturesOrderClient) GetOrderHistory(ctx context.Context, symbol string, limit int) (interface{}, error) {
+	// TODO: 实现 GET /v5/order/history?category=linear&symbol=BTCUSDT&limit=100
+	return nil, fmt.Errorf("not implemented")
+}
+
 // GetAccount 查询账户信息
 func (c *FuturesOrderClient) GetAccount(ctx context.Context) (*AccountInfo, error) {
 	params := url.Values{}
@@ -293,13 +311,13 @@ func (c *FuturesOrderClient) sendRequest(
 	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	signature := c.sign(timestamp, string(jsonBody))
 
-	req.Header.Set("X-BAPI-API-KEY", c.ApiKey)
+	req.Header.Set("X-BAPI-API-KEY", c.credentials.APIKey())
 	req.Header.Set("X-BAPI-TIMESTAMP", timestamp)
 	req.Header.Set("X-BAPI-SIGN", signature)
 	req.Header.Set("Content-Type", "application/json")
 
 	// 执行请求
-	resp, err := c.HttpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -334,12 +352,12 @@ func (c *FuturesOrderClient) sendRequestWithQuery(
 	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	signature := c.sign(timestamp, params.Encode())
 
-	req.Header.Set("X-BAPI-API-KEY", c.ApiKey)
+	req.Header.Set("X-BAPI-API-KEY", c.credentials.APIKey())
 	req.Header.Set("X-BAPI-TIMESTAMP", timestamp)
 	req.Header.Set("X-BAPI-SIGN", signature)
 
 	// 执行请求
-	resp, err := c.HttpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +377,7 @@ func (c *FuturesOrderClient) sendRequestWithQuery(
 
 // sign 生成签名
 func (c *FuturesOrderClient) sign(timestamp, message string) string {
-	h := hmac.New(sha256.New, []byte(c.ApiSecret))
+	h := hmac.New(sha256.New, []byte(c.credentials.apiSecret))
 	h.Write([]byte(timestamp + message))
 	return hex.EncodeToString(h.Sum(nil))
 }

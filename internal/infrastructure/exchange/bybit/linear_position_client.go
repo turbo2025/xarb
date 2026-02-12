@@ -3,24 +3,26 @@ package bybit
 import (
 	"context"
 	"fmt"
-
-	"xarb/internal/domain/service"
 )
 
 // FuturesPositionClient Bybit 期货持仓客户端
 type FuturesPositionClient struct {
-	*ClientFields
+	*APIClient
+}
+
+// NewFuturesPositionClient 创建期货持仓客户端
+func NewFuturesPositionClient(client *APIClient) *FuturesPositionClient {
+	return &FuturesPositionClient{APIClient: client}
 }
 
 // GetPositions 获取永续合约持仓
-func (c *FuturesPositionClient) GetPositions(ctx context.Context) ([]*service.PositionInfo, error) {
+func (c *FuturesPositionClient) GetPositions(ctx context.Context) (interface{}, error) {
 	// TODO: 实现 GET /v5/position/list?category=linear
-	// Bybit 永续合约持仓 API: https://bybit-exchange.cn/zh-CN/help-center/article/POSITION_API
 	return nil, fmt.Errorf("not implemented")
 }
 
 // GetPosition 获取单个交易对的持仓
-func (c *FuturesPositionClient) GetPosition(ctx context.Context, symbol string) (*service.PositionInfo, error) {
+func (c *FuturesPositionClient) GetPosition(ctx context.Context, symbol string) (interface{}, error) {
 	// TODO: 实现 GET /v5/position/list?category=linear&symbol=BTCUSDT
 	return nil, fmt.Errorf("not implemented")
 }

@@ -9,6 +9,7 @@ import (
 
 	"xarb/internal/application/usecase/monitor"
 	"xarb/internal/infrastructure/config"
+	"xarb/internal/infrastructure/factory"
 	"xarb/internal/infrastructure/logger"
 	"xarb/internal/infrastructure/svc"
 
@@ -32,9 +33,15 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Initialize exchange clients & registry once (shared across services)
+	apiClients, err := factory.NewAPIClients(cfg)
+	if err != nil {
+		log.Fatal().Err(err).Msg("exchange client initialization failed")
+	}
+
 	// Initialize all dependencies through ServiceContext
 	// ServiceContext 按照依赖顺序初始化所有组件
-	serviceCtx, err := svc.New(ctx, cfg)
+	serviceCtx, err := svc.New(ctx, cfg, apiClients)
 	if err != nil {
 		log.Fatal().Err(err).Msg("service context initialization failed")
 	}
@@ -42,6 +49,19 @@ func main() {
 
 	// Create and run monitor service with complete dependencies
 	service := monitor.NewService(serviceCtx.BuildMonitorServiceDeps())
+
+	// Optional: fetch and print Binance spot balance once at startup
+	if spotClients := apiClients.ExchangeRegistry.BinanceSpot(); spotClients != nil && spotClients.Account != nil {
+		balance, err := spotClients.Account.GetBalance(ctx)
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to fetch binance spot balance")
+		} else {
+			log.Info().
+				Str("exchange", "binance").
+				Float64("spot_balance_usdt", balance).
+				Msg("binance spot balance")
+		}
+	}
 
 	// Log startup info
 	log.Info().

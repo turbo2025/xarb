@@ -62,7 +62,7 @@ func NewExchangeClientRegistry() *ExchangeClientRegistry {
 }
 
 // Register 通用注册方法，根据交易所名称动态注册
-func (r *ExchangeClientRegistry) Register(exchangeName string, cfg config.ExchangeConfig) error {
+func (r *ExchangeClientRegistry) Register(exchangeName string, cfg *config.ExchangeConfig) error {
 	// 验证参数
 	if cfg.APIKey == "" || cfg.SecretKey == "" {
 		return fmt.Errorf("%s: apiKey and apiSecret cannot be empty", exchangeName)
@@ -81,19 +81,15 @@ func (r *ExchangeClientRegistry) Register(exchangeName string, cfg config.Exchan
 }
 
 // RegisterBinance 注册 Binance 业务集合
-func (r *ExchangeClientRegistry) RegisterBinance(cfg config.ExchangeConfig) error {
+func (r *ExchangeClientRegistry) RegisterBinance(cfg *config.ExchangeConfig) error {
 
 	// 检查是否已注册
 	if r.binanceSpot != nil || r.binanceFutures != nil {
 		return fmt.Errorf("binance: already registered")
 	}
 
-	// 创建 Manager 配置（自动初始化 HTTP 连接、凭证和 URL）
-	config := binance.NewManagerConfig(cfg)
-
-	// 创建两个 Manager
-	spotMgr := binance.NewSpotManager(config)
-	futuresMgr := binance.NewFuturesManager(config)
+	// 创建两个 Manager（内部会共享 HTTP 客户端与凭证）
+	spotMgr, futuresMgr := binance.NewManagers(cfg.APIKey, cfg.SecretKey, cfg.SpotURL, cfg.FuturesURL)
 
 	// 组装成强类型的客户端集合
 	r.binanceSpot = &BinanceSpotClients{
@@ -112,18 +108,14 @@ func (r *ExchangeClientRegistry) RegisterBinance(cfg config.ExchangeConfig) erro
 }
 
 // RegisterBybit 注册 Bybit 业务集合
-func (r *ExchangeClientRegistry) RegisterBybit(cfg config.ExchangeConfig) error {
+func (r *ExchangeClientRegistry) RegisterBybit(cfg *config.ExchangeConfig) error {
 	// 检查是否已注册
 	if r.bybitSpot != nil || r.bybitFutures != nil {
 		return fmt.Errorf("bybit: already registered")
 	}
 
-	// 创建 Manager 配置（自动初始化 HTTP 连接、凭证和 URL）
-	config := bybit.NewManagerConfig(cfg)
-
-	// 创建两个 Manager
-	spotMgr := bybit.NewSpotManager(config)
-	futuresMgr := bybit.NewFuturesManager(config)
+	// 创建两个 Manager（内部会共享 HTTP 客户端与凭证）
+	spotMgr, futuresMgr := bybit.NewManagers(cfg.APIKey, cfg.SecretKey, cfg.SpotURL, cfg.FuturesURL)
 
 	// 组装成强类型的客户端集合
 	r.bybitSpot = &BybitSpotClients{

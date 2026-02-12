@@ -9,7 +9,12 @@ import (
 
 // FuturesAccountClient Bybit 期货账户查询客户端
 type FuturesAccountClient struct {
-	*ClientFields
+	*APIClient
+}
+
+// NewFuturesAccountClient 创建期货账户客户端
+func NewFuturesAccountClient(client *APIClient) *FuturesAccountClient {
+	return &FuturesAccountClient{APIClient: client}
 }
 
 // accountResponse API 响应结构
@@ -138,24 +143,6 @@ type orderHistoryResponse struct {
 // GetAccount 获取账户信息
 func (c *FuturesAccountClient) GetAccount(ctx context.Context) (*service.AccountInfo, error) {
 	// TODO: 实现 GET /v5/account/wallet-balance
-	return nil, fmt.Errorf("not implemented")
-}
-
-// GetPositions 获取持仓
-func (c *FuturesAccountClient) GetPositions(ctx context.Context) ([]*service.PositionInfo, error) {
-	// TODO: 实现 GET /v5/position/list
-	return nil, fmt.Errorf("not implemented")
-}
-
-// GetOpenOrders 获取挂单
-func (c *FuturesAccountClient) GetOpenOrders(ctx context.Context, symbol string) ([]*service.OpenOrderInfo, error) {
-	// TODO: 实现 GET /v5/order/realtime
-	return nil, fmt.Errorf("not implemented")
-}
-
-// GetOrderHistory 获取订单历史
-func (c *FuturesAccountClient) GetOrderHistory(ctx context.Context, symbol string, limit int) ([]*service.OrderLog, error) {
-	// TODO: 实现 GET /v5/order/history
 	return nil, fmt.Errorf("not implemented")
 }
 

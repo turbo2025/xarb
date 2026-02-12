@@ -7,8 +7,12 @@ import (
 
 // SpotOrderClient Bybit 现货订单客户端
 type SpotOrderClient struct {
-	*ClientFields
-	baseURL string
+	*APIClient
+}
+
+// NewSpotOrderClient 创建现货订单客户端
+func NewSpotOrderClient(client *APIClient) *SpotOrderClient {
+	return &SpotOrderClient{APIClient: client}
 }
 
 // PlaceOrder 下单
@@ -39,4 +43,16 @@ func (c *SpotOrderClient) GetOrderStatus(ctx context.Context, symbol string, ord
 func (c *SpotOrderClient) GetFundingRate(ctx context.Context, symbol string) (float64, error) {
 	// 现货交易不适用资金费率
 	return 0, nil
+}
+
+// GetOpenOrders 获取挂单
+func (c *SpotOrderClient) GetOpenOrders(ctx context.Context, symbol string) (interface{}, error) {
+	// TODO: 实现 GET /v5/order/realtime?category=spot&symbol=BTCUSDT
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetOrderHistory 获取订单历史
+func (c *SpotOrderClient) GetOrderHistory(ctx context.Context, symbol string, limit int) (interface{}, error) {
+	// TODO: 实现 GET /v5/order/history?category=spot&symbol=BTCUSDT&limit=100
+	return nil, fmt.Errorf("not implemented")
 }

@@ -3,16 +3,18 @@ package binance
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"xarb/internal/domain/service"
 )
 
 // SpotPositionClient Binance 现货持仓（钱包）客户端
 type SpotPositionClient struct {
-	credentials *Credentials
-	httpClient  *http.Client
-	baseURL     string
+	*APIClient
+}
+
+// NewSpotPositionClient 创建现货持仓客户端
+func NewSpotPositionClient(client *APIClient) *SpotPositionClient {
+	return &SpotPositionClient{APIClient: client}
 }
 
 // GetBalances 获取所有币种余额（钱包）
