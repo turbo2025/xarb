@@ -248,6 +248,7 @@ func (sc *ServiceContext) BuildMonitorServiceDeps() monitor.ServiceDeps {
 		PrintEveryMin:    sc.Config.App.PrintEveryMin,
 		DeltaThreshold:   sc.Config.Arbitrage.DeltaThreshold,
 		Sink:             sc.Sink,
+		Repo:             sc.sqliteRepo,
 		ArbitrageRepo:    sc.sqliteArbRepo,
 		ArbitrageCalc:    sc.arbitrageCalculator,
 		SymbolMapper:     sc.symbolMapper,

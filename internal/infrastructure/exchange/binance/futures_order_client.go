@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
-	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -251,43 +249,7 @@ func (c *FuturesOrderClient) sendRequest(
 	path string,
 	params url.Values,
 ) ([]byte, error) {
-	// 添加时间戳
-	params.Set("timestamp", strconv.FormatInt(time.Now().UnixMilli(), 10))
-
-	// 签名
-	signature := c.credentials.Sign(params.Encode())
-	params.Set("signature", signature)
-
-	// 构建请求URL
-	reqURL := c.baseURL + path + "?" + params.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, method, reqURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// 添加 API Key 头
-	req.Header.Set("X-MBX-APIKEY", c.credentials.APIKey())
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	// 执行请求
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	// 检查 HTTP 状态码
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("http %d: %s", resp.StatusCode, string(body))
-	}
-
-	return body, nil
+	return c.APIClient.signedRequest(ctx, method, path, params)
 }
 
 // ===== Response Models =====

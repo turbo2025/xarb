@@ -2,17 +2,11 @@ package bybit
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -294,45 +288,7 @@ func (c *FuturesOrderClient) sendRequest(
 	path string,
 	payload interface{},
 ) ([]byte, error) {
-	// 序列化 payload
-	jsonBody, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	// 构建请求
-	reqURL := c.baseURL + path
-	req, err := http.NewRequestWithContext(ctx, method, reqURL, strings.NewReader(string(jsonBody)))
-	if err != nil {
-		return nil, err
-	}
-
-	// 添加签名
-	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
-	signature := c.sign(timestamp, string(jsonBody))
-
-	req.Header.Set("X-BAPI-API-KEY", c.credentials.APIKey())
-	req.Header.Set("X-BAPI-TIMESTAMP", timestamp)
-	req.Header.Set("X-BAPI-SIGN", signature)
-	req.Header.Set("Content-Type", "application/json")
-
-	// 执行请求
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("http %d: %s", resp.StatusCode, string(body))
-	}
-
-	return body, nil
+	return c.APIClient.signedJSONRequest(ctx, method, path, payload)
 }
 
 // sendRequestWithQuery 发送 GET 请求
@@ -342,44 +298,7 @@ func (c *FuturesOrderClient) sendRequestWithQuery(
 	path string,
 	params url.Values,
 ) ([]byte, error) {
-	reqURL := c.baseURL + path + "?" + params.Encode()
-	req, err := http.NewRequestWithContext(ctx, method, reqURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// 添加签名
-	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
-	signature := c.sign(timestamp, params.Encode())
-
-	req.Header.Set("X-BAPI-API-KEY", c.credentials.APIKey())
-	req.Header.Set("X-BAPI-TIMESTAMP", timestamp)
-	req.Header.Set("X-BAPI-SIGN", signature)
-
-	// 执行请求
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("http %d: %s", resp.StatusCode, string(body))
-	}
-
-	return body, nil
-}
-
-// sign 生成签名
-func (c *FuturesOrderClient) sign(timestamp, message string) string {
-	h := hmac.New(sha256.New, []byte(c.credentials.apiSecret))
-	h.Write([]byte(timestamp + message))
-	return hex.EncodeToString(h.Sum(nil))
+	return c.APIClient.signedQueryRequest(ctx, method, path, params)
 }
 
 // ===== Response Models =====

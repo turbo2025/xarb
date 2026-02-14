@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"xarb/internal/domain/service"
 )
@@ -50,7 +49,7 @@ func (c *SpotAccountClient) GetAccount(ctx context.Context) (*service.AccountInf
 
 // GetBalance 获取现货账户总余额
 func (c *SpotAccountClient) GetBalance(ctx context.Context) (float64, error) {
-	resp, err := c.fetchSpotAccount(ctx)
+	resp, err := c.fetchAccount(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -83,8 +82,8 @@ func (c *SpotAccountClient) GetBalance(ctx context.Context) (float64, error) {
 	return totalUSDT, nil
 }
 
-// fetchSpotAccount 调用 Binance 现货账户接口
-func (c *SpotAccountClient) fetchSpotAccount(ctx context.Context) (*spotAccountResponse, error) {
+// fetchAccount 调用 Binance 现货账户接口
+func (c *SpotAccountClient) fetchAccount(ctx context.Context) (*spotAccountResponse, error) {
 	body, err := c.signedRequest(ctx, http.MethodGet, "/api/v3/account", nil)
 	if err != nil {
 		return nil, err
@@ -152,45 +151,6 @@ func (c *SpotAccountClient) fetchTickerPrice(ctx context.Context, symbol string)
 		return 0, fmt.Errorf("parse ticker price failed: %w", err)
 	}
 	return price, nil
-}
-
-// signedRequest 发送需要签名的请求
-func (c *SpotAccountClient) signedRequest(ctx context.Context, method, path string, params url.Values) ([]byte, error) {
-	if params == nil {
-		params = url.Values{}
-	}
-	params.Set("timestamp", strconv.FormatInt(time.Now().UnixMilli(), 10))
-	if params.Get("recvWindow") == "" {
-		params.Set("recvWindow", "5000")
-	}
-
-	query := params.Encode()
-	signature := c.credentials.Sign(query)
-	reqURL := fmt.Sprintf("%s%s?%s&signature=%s", strings.TrimRight(c.baseURL, "/"), path, query, signature)
-
-	req, err := http.NewRequestWithContext(ctx, method, reqURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("X-MBX-APIKEY", c.credentials.APIKey())
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("account http %d: %s", resp.StatusCode, string(body))
-	}
-
-	return body, nil
 }
 
 func isUSDStableCoin(asset string) bool {

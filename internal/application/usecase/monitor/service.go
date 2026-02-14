@@ -101,7 +101,9 @@ func (s *Service) Run(ctx context.Context) error {
 			line := s.fmt.Render(s.st, RenderSnapshot)
 			_ = s.deps.Sink.WriteSnapshot(now, line)
 			// optional: persist snapshot
-			_ = s.deps.Repo.InsertSnapshot(ctx, now.UnixMilli(), line)
+			if s.deps.Repo != nil {
+				_ = s.deps.Repo.InsertSnapshot(ctx, now.UnixMilli(), line)
+			}
 
 		case t := <-merged:
 			// 保存价格到缓存
@@ -119,7 +121,7 @@ func (s *Service) Run(ctx context.Context) error {
 			}
 
 			// persist latest (optional)
-			if t.PriceNum > 0 {
+			if s.deps.Repo != nil && t.PriceNum > 0 {
 				_ = s.deps.Repo.UpsertLatestPrice(ctx, t.Exchange, t.Symbol, t.PriceNum, t.Ts)
 			}
 

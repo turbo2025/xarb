@@ -17,6 +17,10 @@ import (
 )
 
 func main() {
+	// Setup context with graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	logger.Setup()
 
 	// Parse flags
@@ -27,30 +31,27 @@ func main() {
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatal().Err(err).Str("config", *configPath).Msg("load config failed")
+		return
 	}
-
-	// Setup context with graceful shutdown
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	// Initialize exchange clients & registry once (shared across services)
 	apiClients, err := factory.NewAPIClients(cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("exchange client initialization failed")
+		return
 	}
 
-	// Initialize all dependencies through ServiceContext
-	// ServiceContext 按照依赖顺序初始化所有组件
 	serviceCtx, err := svc.New(ctx, cfg, apiClients)
 	if err != nil {
 		log.Fatal().Err(err).Msg("service context initialization failed")
+		return
 	}
+
 	defer serviceCtx.Close()
-
-	// Create and run monitor service with complete dependencies
 	service := monitor.NewService(serviceCtx.BuildMonitorServiceDeps())
+	if err := service.Run(ctx); err != nil {
+		log.Error().Err(err).Msg("monitor service exited")
+	}
 
-	// Optional: fetch and print Binance spot balance once at startup
 	if spotClients := apiClients.ExchangeRegistry.BinanceSpot(); spotClients != nil && spotClients.Account != nil {
 		balance, err := spotClients.Account.GetBalance(ctx)
 		if err != nil {
@@ -62,8 +63,6 @@ func main() {
 				Msg("binance spot balance")
 		}
 	}
-
-	// Log startup info
 	log.Info().
 		Str("config", *configPath).
 		Int("symbols", len(cfg.Symbols.List)).
@@ -72,8 +71,4 @@ func main() {
 		Bool("storage_enabled", cfg.Storage.Enabled).
 		Msg("xarb started")
 
-	// Run service
-	if err := service.Run(ctx); err != nil {
-		log.Error().Err(err).Msg("monitor service exited")
-	}
 }
