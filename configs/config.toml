@@ -12,26 +12,29 @@ delta_threshold = 5.0
 enabled = true
 api_key = "GODOZ5H4IQVahtXu216X5kdQBTbYT4tNf5LydQWuxexlMJZrw0xbQvrL1BP1PunN"
 secret_key = "j14JDmShOc6SUppf6Uz4vhnQwsbUGK6f2NzfTV4hGcnkwCJaXq8OtNbZUx5gLINU"
-futures_url = "https://fapi.binance.com"
-spot_url = "https://api.binance.com"
-ws_url = "wss://fstream.binance.com/ws"
+spot_http_url = "https://api.binance.com"
+spot_ws_url = ""
+perpetual_http_url = "https://fapi.binance.com"
+perpetual_ws_url = "wss://fstream.binance.com/ws"
 
 [exchanges.bybit]
 enabled = true
 api_key = "ovxG4pT6BFE8Oh7b7E"
 secret_key = "gPfgyDrfR4WswFdPgVpXsbnSEQeaCcX30Lsu"
-futures_url = "https://api.bybit.com"
-spot_url = "https://api.bybit.com"
-ws_url = "wss://stream.bybit.com/spot/quote/ws/v2"
+spot_http_url = "https://api.bybit.com"
+spot_ws_url = ""
+perpetual_http_url = "https://api.bybit.com"
+perpetual_ws_url = "wss://stream.bybit.com/v5/public/linear"
 
 [exchanges.okx]
 enabled = false
 api_key = "dc6a2205-830f-4952-9acd-81d5b9ea2470"
 secret_key = "6218E25764E121957B36D854B4776FEC"
 passphrase = "Trade123@"
-futures_url = "https://www.okx.com"
-spot_url = "https://www.okx.com"
-ws_url = "wss://ws.okx.com:8443/ws/v5/public"
+spot_http_url = "https://www.okx.com"
+spot_ws_url = ""
+perpetual_http_url = "https://www.okx.com"
+perpetual_ws_url = "wss://ws.okx.com:8443/ws/v5/public"
 
 
 [exchanges.bitget]
@@ -39,9 +42,10 @@ enabled = false
 api_key = "bg_6fe0bc583114ca91cb35c4c5a33b1c3d"
 secret_key = "50ec0bdaaa0d43e301fdf286029da7029b5d33dedd412d60e408c88624484710"
 passphrase = "Box2024btc"
-ws_url = "wss://ws.bitget.com/spot/v1/public/stream"
-futures_url = "https://api.bitget.com"
-spot_url = "https://api.bitget.com"
+spot_http_url = "https://api.bitget.com"
+spot_ws_url = ""
+perpetual_http_url = "https://api.bitget.com"
+perpetual_ws_url = "wss://ws.bitget.com/spot/v1/public/stream"
 
 [storage]
 enabled = true

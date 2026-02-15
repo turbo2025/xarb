@@ -10,13 +10,14 @@ import (
 
 // ExchangeConfig 交易所配置（通用格式）
 type ExchangeConfig struct {
-	Enabled    bool   `toml:"enabled"`
-	APIKey     string `toml:"api_key"`
-	SecretKey  string `toml:"secret_key"`
-	Passphrase string `toml:"passphrase"` // 仅 OKX、Bitget 需要
-	FuturesURL string `toml:"futures_url"`
-	SpotURL    string `toml:"spot_url"`
-	WsURL      string `toml:"ws_url"`
+	Enabled          bool   `toml:"enabled"`
+	APIKey           string `toml:"api_key"`
+	SecretKey        string `toml:"secret_key"`
+	Passphrase       string `toml:"passphrase"` // 仅 OKX、Bitget 需要
+	SpotHttpURL      string `toml:"spot_http_url"`
+	SpotWsURL        string `toml:"spot_ws_url"`
+	PerpetualHttpURL string `toml:"perpetual_http_url"`
+	PerpetualWsURL   string `toml:"perpetual_ws_url"`
 }
 
 type Config struct {
@@ -106,8 +107,8 @@ func validate(cfg *Config) error {
 		if !exchCfg.Enabled {
 			continue
 		}
-		if strings.TrimSpace(exchCfg.WsURL) == "" {
-			return fmt.Errorf("exchange.%s.ws_url empty but enabled", exchangeName)
+		if strings.TrimSpace(exchCfg.PerpetualWsURL) == "" {
+			return fmt.Errorf("exchange.%s.perpetual_ws_url empty but enabled", exchangeName)
 		}
 	}
 

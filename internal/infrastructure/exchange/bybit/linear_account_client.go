@@ -2,7 +2,11 @@ package bybit
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/url"
+	"strconv"
+	"time"
 
 	"xarb/internal/domain/service"
 )
@@ -142,12 +146,52 @@ type orderHistoryResponse struct {
 
 // GetAccount 获取账户信息
 func (c *FuturesAccountClient) GetAccount(ctx context.Context) (*service.AccountInfo, error) {
-	// TODO: 实现 GET /v5/account/wallet-balance
-	return nil, fmt.Errorf("not implemented")
+	params := url.Values{}
+	params.Set("accountType", "UNIFIED") // 统一账户类型
+	body, err := c.signedQueryRequest(ctx, "GET", "/v5/account/wallet-balance", params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bybit futures account: %w", err)
+	}
+
+	var resp accountResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal bybit futures account: %w", err)
+	}
+
+	if resp.RetCode != 0 {
+		return nil, fmt.Errorf("bybit api error: %s", resp.RetMsg)
+	}
+
+	// 解析保证金金额
+	totalPositionMM, _ := strconv.ParseFloat(resp.Result.TotalPositionMM, 64)
+	walletBalance, _ := strconv.ParseFloat(resp.Result.WalletBalance, 64)
+	availBalance, _ := strconv.ParseFloat(resp.Result.TotalAvailableBalance, 64)
+
+	return &service.AccountInfo{
+		TotalMargin: walletBalance,
+		UsedMargin:  totalPositionMM,
+		AvailMargin: availBalance,
+		UpdatedAt:   time.Now(),
+	}, nil
 }
 
 // GetBalance 获取余额
 func (c *FuturesAccountClient) GetBalance(ctx context.Context) (float64, error) {
-	// TODO: 实现 GET /v5/account/wallet-balance 并提取总余额
-	return 0, fmt.Errorf("not implemented")
+	params := url.Values{}
+	params.Set("accountType", "UNIFIED") // 统一账户类型
+	body, err := c.signedQueryRequest(ctx, "GET", "/v5/account/wallet-balance", params)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get bybit futures balance: %w", err)
+	}
+
+	var resp accountResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return 0, fmt.Errorf("failed to unmarshal bybit futures balance: %w", err)
+	}
+
+	if resp.RetCode != 0 {
+		return 0, fmt.Errorf("bybit api error: %s", resp.RetMsg)
+	}
+	balance, _ := strconv.ParseFloat(resp.Result.WalletBalance, 64)
+	return balance, nil
 }

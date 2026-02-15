@@ -2,7 +2,10 @@ package binance
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
+	"time"
 
 	"xarb/internal/domain/service"
 )
@@ -68,13 +71,40 @@ type accountResponse struct {
 
 // GetAccount 获取期货账户信息
 func (c *FuturesAccountClient) GetAccount(ctx context.Context) (*service.AccountInfo, error) {
-	// TODO: 实现 GET /fapi/v2/account 并提取 positions 字段
-	// Binance 期货账户 API: https://binance-docs.github.io/apidocs/futures/cn/#user_data-8
-	return nil, fmt.Errorf("not implemented")
+	body, err := c.signedRequest(ctx, "GET", "/fapi/v2/account", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get binance futures account: %w", err)
+	}
+
+	var resp accountResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal binance futures account: %w", err)
+	}
+
+	// 解析保证金金额
+	totalMaintMargin, _ := strconv.ParseFloat(resp.TotalMaintMargin, 64)
+	totalWalletBalance, _ := strconv.ParseFloat(resp.TotalWalletBalance, 64)
+
+	return &service.AccountInfo{
+		TotalMargin: totalWalletBalance,
+		UsedMargin:  totalMaintMargin,
+		AvailMargin: totalWalletBalance - totalMaintMargin,
+		UpdatedAt:   time.Now(),
+	}, nil
 }
 
 // GetBalance 获取余额
 func (c *FuturesAccountClient) GetBalance(ctx context.Context) (float64, error) {
-	// TODO: 实现 GET /fapi/v2/account 并提取总 USDT 价值
-	return 0, fmt.Errorf("not implemented")
+	body, err := c.signedRequest(ctx, "GET", "/fapi/v2/account", nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get binance futures balance: %w", err)
+	}
+
+	var resp accountResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return 0, fmt.Errorf("failed to unmarshal binance futures balance: %w", err)
+	}
+
+	balance, _ := strconv.ParseFloat(resp.TotalWalletBalance, 64)
+	return balance, nil
 }

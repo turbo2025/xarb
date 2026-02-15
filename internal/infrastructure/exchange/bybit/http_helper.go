@@ -52,10 +52,15 @@ func (c *APIClient) signedQueryRequest(ctx context.Context, method, path string,
 
 func (c *APIClient) doSignedRequest(req *http.Request, payload string) ([]byte, error) {
 	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
-	signature := c.credentials.Sign(timestamp + payload)
+	recvWindow := "5000"
+
+	// Bybit V5 signature: timestamp + apiKey + recvWindow + payload
+	signStr := timestamp + c.credentials.APIKey() + recvWindow + payload
+	signature := c.credentials.Sign(signStr)
 
 	req.Header.Set("X-BAPI-API-KEY", c.credentials.APIKey())
 	req.Header.Set("X-BAPI-TIMESTAMP", timestamp)
+	req.Header.Set("X-BAPI-RECV-WINDOW", recvWindow)
 	req.Header.Set("X-BAPI-SIGN", signature)
 
 	resp, err := c.httpClient.Do(req)

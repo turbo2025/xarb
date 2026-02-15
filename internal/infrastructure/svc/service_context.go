@@ -55,22 +55,52 @@ type ServiceContext struct {
 
 // New 创建并初始化 ServiceContext
 // 这是应用启动的唯一入口点，所有依赖初始化都在这里完成
-func New(ctx context.Context, cfg *config.Config, apiClients *factory.APIClients) (*ServiceContext, error) {
+func New(ctx context.Context, cfg *config.Config) (*ServiceContext, error) {
+	// Initialize exchange clients & registry once (shared across services)
+	apiClients, err := factory.NewAPIClients(cfg)
+	if err != nil {
+		log.Fatal().Err(err).Msg("exchange client initialization failed")
+		return nil, fmt.Errorf("failed to initialize api clients: %w", err)
+	}
+	// if binanceSpot := apiClients.ExchangeRegistry.BinanceSpot(); binanceSpot != nil {
+	// 	factory.LogSpotBalance(ctx, factory.ExchangeBinance, binanceSpot.Account)
+	// }
+	// if bybitSpot := apiClients.ExchangeRegistry.BybitSpot(); bybitSpot != nil {
+	// 	factory.LogSpotBalance(ctx, factory.ExchangeBybit, bybitSpot.Account)
+	// }
+
+	// // 获取 Binance 期货合约保证金
+	// if binanceFutures := apiClients.ExchangeRegistry.BinanceFutures(); binanceFutures != nil {
+	// 	if account, err := binanceFutures.Account.GetAccount(ctx); err == nil {
+	// 		log.Info().
+	// 			Float64("total_margin", account.TotalMargin).
+	// 			Float64("used_margin", account.UsedMargin).
+	// 			Float64("avail_margin", account.AvailMargin).
+	// 			Msgf("✓ Binance futures account")
+	// 	} else {
+	// 		log.Warn().Err(err).Msg("failed to fetch binance futures account info")
+	// 	}
+	// }
+
+	// // 获取 Bybit 期货合约保证金
+	// if bybitFutures := apiClients.ExchangeRegistry.BybitFutures(); bybitFutures != nil {
+	// 	if account, err := bybitFutures.Account.GetAccount(ctx); err == nil {
+	// 		log.Info().
+	// 			Float64("total_margin", account.TotalMargin).
+	// 			Float64("used_margin", account.UsedMargin).
+	// 			Float64("avail_margin", account.AvailMargin).
+	// 			Msgf("✓ Bybit futures account")
+	// 	} else {
+	// 		log.Warn().Err(err).Msg("failed to fetch bybit futures account info")
+	// 	}
+	// }
+
 	sc := &ServiceContext{
 		Ctx:         ctx,
 		Config:      cfg,
 		Sink:        console.NewSink(),
 		apiClients:  apiClients,
 		closerChain: make([]func() error, 0),
-	}
-
-	// 如果未传入 API 客户端，则在这里初始化一次
-	if sc.apiClients == nil {
-		clients, err := factory.NewAPIClients(sc.Config)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize api clients: %w", err)
-		}
-		sc.apiClients = clients
 	}
 
 	// 初始化所有组件，按依赖顺序

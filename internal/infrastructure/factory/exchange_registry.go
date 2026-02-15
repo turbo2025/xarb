@@ -67,8 +67,8 @@ func (r *ExchangeClientRegistry) Register(exchangeName string, cfg *config.Excha
 	if cfg.APIKey == "" || cfg.SecretKey == "" {
 		return fmt.Errorf("%s: apiKey and apiSecret cannot be empty", exchangeName)
 	}
-	if cfg.FuturesURL == "" || cfg.SpotURL == "" {
-		return fmt.Errorf("%s: futuresURL and spotURL cannot be empty", exchangeName)
+	if cfg.PerpetualHttpURL == "" || cfg.SpotHttpURL == "" {
+		return fmt.Errorf("%s: PerpetualHttpURL and SpotHttpURL cannot be empty", exchangeName)
 	}
 	switch exchangeName {
 	case ExchangeBinance:
@@ -89,7 +89,7 @@ func (r *ExchangeClientRegistry) RegisterBinance(cfg *config.ExchangeConfig) err
 	}
 
 	// 创建两个 Manager（内部会共享 HTTP 客户端与凭证）
-	spotMgr, futuresMgr := binance.NewManagers(cfg.APIKey, cfg.SecretKey, cfg.SpotURL, cfg.FuturesURL)
+	spotMgr, perpetualMgr := binance.NewManagers(cfg.APIKey, cfg.SecretKey, cfg.SpotHttpURL, cfg.PerpetualHttpURL)
 
 	// 组装成强类型的客户端集合
 	r.binanceSpot = &BinanceSpotClients{
@@ -99,9 +99,9 @@ func (r *ExchangeClientRegistry) RegisterBinance(cfg *config.ExchangeConfig) err
 	}
 
 	r.binanceFutures = &BinanceFuturesClients{
-		Order:    futuresMgr.Order,
-		Position: futuresMgr.Position,
-		Account:  futuresMgr.Account,
+		Order:    perpetualMgr.Order,
+		Position: perpetualMgr.Position,
+		Account:  perpetualMgr.Account,
 	}
 
 	return nil
@@ -115,7 +115,7 @@ func (r *ExchangeClientRegistry) RegisterBybit(cfg *config.ExchangeConfig) error
 	}
 
 	// 创建两个 Manager（内部会共享 HTTP 客户端与凭证）
-	spotMgr, futuresMgr := bybit.NewManagers(cfg.APIKey, cfg.SecretKey, cfg.SpotURL, cfg.FuturesURL)
+	spotMgr, perpetualMgr := bybit.NewManagers(cfg.APIKey, cfg.SecretKey, cfg.SpotHttpURL, cfg.PerpetualHttpURL)
 
 	// 组装成强类型的客户端集合
 	r.bybitSpot = &BybitSpotClients{
@@ -125,9 +125,9 @@ func (r *ExchangeClientRegistry) RegisterBybit(cfg *config.ExchangeConfig) error
 	}
 
 	r.bybitFutures = &BybitFuturesClients{
-		Order:    futuresMgr.Order,
-		Position: futuresMgr.Position,
-		Account:  futuresMgr.Account,
+		Order:    perpetualMgr.Order,
+		Position: perpetualMgr.Position,
+		Account:  perpetualMgr.Account,
 	}
 
 	return nil

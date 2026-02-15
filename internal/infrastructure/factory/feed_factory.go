@@ -25,13 +25,13 @@ func NewPriceFeeds(cfg *config.Config) []monitor.PriceFeed {
 		var feed monitor.PriceFeed
 		switch exchangeName {
 		case "binance":
-			feed = binance.NewFuturesMiniTickerFeed(exchCfg.WsURL)
+			feed = binance.NewFuturesMiniTickerFeed(exchCfg.PerpetualWsURL)
 		case "bybit":
-			feed = bybit.NewLinearTickerFeed(exchCfg.WsURL)
+			feed = bybit.NewLinearTickerFeed(exchCfg.PerpetualWsURL)
 		case "okx":
-			feed = okx.NewPublicLinearTickerFeed(exchCfg.WsURL)
+			feed = okx.NewPublicLinearTickerFeed(exchCfg.PerpetualWsURL)
 		case "bitget":
-			feed = bitget.NewPublicMarketTickerFeed(exchCfg.WsURL)
+			feed = bitget.NewPublicMarketTickerFeed(exchCfg.PerpetualWsURL)
 		default:
 			log.Warn().Msgf("⚠️ Unknown exchange: %s", exchangeName)
 			continue
