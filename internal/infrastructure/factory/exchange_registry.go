@@ -59,6 +59,11 @@ type OKXPerpetualClients struct {
 	Account *okx.PerpetualAccountClient
 }
 
+// BitgetPerpetualClients Bitget 永续合约客户端集合（目前仅有 WebSocket 支持）
+type BitgetPerpetualClients struct {
+	// Bitget 目前仅实现 WebSocket 价格源，HTTP 客户端待实现
+}
+
 // ============================================
 // 注册表
 // ============================================
@@ -71,6 +76,7 @@ type ExchangeClientRegistry struct {
 	bybitPerpetual   *BybitPerpetualClients
 	okxSpot          *OKXSpotClients
 	okxPerpetual     *OKXPerpetualClients
+	bitgetPerpetual  *BitgetPerpetualClients
 }
 
 // NewExchangeClientRegistry 创建交易所业务集合注册表
@@ -94,6 +100,8 @@ func (r *ExchangeClientRegistry) Register(exchangeName string, cfg *config.Excha
 		return r.RegisterBybit(cfg)
 	case ExchangeOKX:
 		return r.RegisterOKX(cfg)
+	case ExchangeBitget:
+		return r.RegisterBitget(cfg)
 	default:
 		return fmt.Errorf("unknown exchange: %s", exchangeName)
 	}
@@ -211,4 +219,23 @@ func (r *ExchangeClientRegistry) OKXSpot() *OKXSpotClients {
 // OKXPerpetual 获取 OKX 永续合约客户端集合
 func (r *ExchangeClientRegistry) OKXPerpetual() *OKXPerpetualClients {
 	return r.okxPerpetual
+}
+
+// RegisterBitget 注册 Bitget 业务集合（目前仅支持 WebSocket）
+func (r *ExchangeClientRegistry) RegisterBitget(cfg *config.ExchangeConfig) error {
+	// 检查是否已注册
+	if r.bitgetPerpetual != nil {
+		return fmt.Errorf("bitget: already registered")
+	}
+
+	// Bitget 目前仅实现 WebSocket 价格源，HTTP 客户端待实现
+	// 此处预留位置，确保 bitget 包被导入以执行其 init() 函数注册 pricefeed 工厂
+	r.bitgetPerpetual = &BitgetPerpetualClients{}
+
+	return nil
+}
+
+// BitgetPerpetual 获取 Bitget 永续合约客户端集合
+func (r *ExchangeClientRegistry) BitgetPerpetual() *BitgetPerpetualClients {
+	return r.bitgetPerpetual
 }

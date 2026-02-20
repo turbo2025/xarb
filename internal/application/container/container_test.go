@@ -15,9 +15,8 @@ func TestContainerWithSQLite(t *testing.T) {
 	defer os.Remove(dbPath)
 
 	cfg := &config.Config{}
-	cfg.Storage.Enabled = true
-	cfg.Storage.SQLite.Enabled = true
-	cfg.Storage.SQLite.Path = dbPath
+	cfg.SQLite.Enabled = true
+	cfg.SQLite.Path = dbPath
 
 	c, err := infracontainer.New(cfg)
 	if err != nil {
@@ -36,9 +35,8 @@ func TestContainerServiceWorkflow(t *testing.T) {
 	defer os.Remove(dbPath)
 
 	cfg := &config.Config{}
-	cfg.Storage.Enabled = true
-	cfg.Storage.SQLite.Enabled = true
-	cfg.Storage.SQLite.Path = dbPath
+	cfg.SQLite.Enabled = true
+	cfg.SQLite.Path = dbPath
 
 	c, err := infracontainer.New(cfg)
 	if err != nil {

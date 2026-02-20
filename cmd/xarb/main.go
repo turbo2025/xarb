@@ -41,7 +41,8 @@ func main() {
 		Int("symbols", len(cfg.Symbols.List)).
 		Int("print_every_min", cfg.App.PrintEveryMin).
 		Float64("delta_threshold", cfg.Arbitrage.DeltaThreshold).
-		Bool("storage_enabled", cfg.Storage.Enabled).
+		Bool("sqlite_enabled", cfg.SQLite.Enabled).
+		Bool("redis_enabled", cfg.Redis.Enabled).
 		Msg("xarb started")
 
 	service := monitor.NewService(serviceCtx.BuildMonitorServiceDeps())
