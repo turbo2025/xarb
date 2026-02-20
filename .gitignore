@@ -48,6 +48,7 @@ bin/
 *.log
 
 # Database files
+data/*.db
 *.db
 *.sqlite
 *.sqlite3
