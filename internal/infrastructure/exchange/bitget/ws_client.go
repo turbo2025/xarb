@@ -9,17 +9,24 @@ import (
 	"time"
 
 	"xarb/internal/application/port"
+	"xarb/internal/infrastructure/exchange"
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
 
 type PerpetualTickerFeed struct {
-	wsURL string // e.g., wss://ws.bitget.com/spot/v1/public
+	wsURL     string                   // e.g., wss://ws.bitget.com/spot/v1/public
+	converter exchange.SymbolConverter // 符号转换器
 }
 
-func NewPerpetualTickerFeed(wsURL string) *PerpetualTickerFeed {
-	return &PerpetualTickerFeed{wsURL: strings.TrimSpace(wsURL)}
+// NewPerpetualTickerFeedWithQuote Bitget
+func NewPerpetualTickerFeedWithQuote(wsURL string, quote string) *PerpetualTickerFeed {
+	// Bitget使用标准的BTCUSDT格式，不需要quote参数
+	return &PerpetualTickerFeed{
+		wsURL:     strings.TrimSpace(wsURL),
+		converter: exchange.NewCommonSymbolConverter(quote),
+	}
 }
 
 func (f *PerpetualTickerFeed) Name() string { return "BITGET" }

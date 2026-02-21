@@ -2,8 +2,9 @@
 print_every_min = 5
 
 [symbols]
-list = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
-# list = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "ZECUSDT", "AAVEUSDT"]
+# 新格式：使用 coins + quote (推荐)
+coins = ["BTC", "ETH", "SOL"]
+quote = "USDT"
 
 [arbitrage]
 delta_threshold = 5.0

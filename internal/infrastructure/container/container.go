@@ -32,12 +32,10 @@ func New(cfg *config.Config) (*Container, error) {
 	}
 
 	// 初始化存储层
-	if cfg.Storage.Enabled {
-		if err := c.initStorage(); err != nil {
-			// 清理已初始化的资源
-			_ = c.Close()
-			return nil, err
-		}
+	if err := c.initStorage(); err != nil {
+		// 清理已初始化的资源
+		_ = c.Close()
+		return nil, err
 	}
 
 	return c, nil
@@ -46,14 +44,14 @@ func New(cfg *config.Config) (*Container, error) {
 // initStorage 初始化存储层（Redis、SQLite、Postgres）
 func (c *Container) initStorage() error {
 	// Redis
-	if c.cfg.Storage.Redis.Enabled {
+	if c.cfg.Redis.Enabled {
 		if err := c.initRedis(); err != nil {
 			return fmt.Errorf("redis init failed: %w", err)
 		}
 	}
 
 	// SQLite
-	if c.cfg.Storage.SQLite.Enabled {
+	if c.cfg.SQLite.Enabled {
 		if err := c.initSQLite(); err != nil {
 			return fmt.Errorf("sqlite init failed: %w", err)
 		}
@@ -72,9 +70,9 @@ func (c *Container) initStorage() error {
 // initRedis 初始化 Redis 连接
 func (c *Container) initRedis() error {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     c.cfg.Storage.Redis.Addr,
-		Password: c.cfg.Storage.Redis.Password,
-		DB:       c.cfg.Storage.Redis.DB,
+		Addr:     c.cfg.Redis.Addr,
+		Password: c.cfg.Redis.Password,
+		DB:       c.cfg.Redis.DB,
 	})
 
 	// 测试连接
@@ -86,14 +84,14 @@ func (c *Container) initRedis() error {
 	}
 
 	c.redisClient = rdb
-	ttl := time.Duration(c.cfg.Storage.Redis.TTLSeconds) * time.Second
+	ttl := time.Duration(c.cfg.Redis.TTLSeconds) * time.Second
 
 	c.redisRepo = redisrepo.New(
 		rdb,
-		c.cfg.Storage.Redis.Prefix,
+		c.cfg.Redis.Prefix,
 		ttl,
-		c.cfg.Storage.Redis.SignalStream,
-		c.cfg.Storage.Redis.SignalChannel,
+		c.cfg.Redis.SignalStream,
+		c.cfg.Redis.SignalChannel,
 	)
 
 	// 注册关闭回调
@@ -103,8 +101,8 @@ func (c *Container) initRedis() error {
 	})
 
 	log.Info().
-		Str("addr", c.cfg.Storage.Redis.Addr).
-		Int("db", c.cfg.Storage.Redis.DB).
+		Str("addr", c.cfg.Redis.Addr).
+		Int("db", c.cfg.Redis.DB).
 		Msg("redis initialized")
 
 	return nil
@@ -112,7 +110,7 @@ func (c *Container) initRedis() error {
 
 // initSQLite 初始化 SQLite 数据库
 func (c *Container) initSQLite() error {
-	repo, err := sqliterepo.New(c.cfg.Storage.SQLite.Path)
+	repo, err := sqliterepo.New(c.cfg.SQLite.Path)
 	if err != nil {
 		return err
 	}
@@ -126,7 +124,7 @@ func (c *Container) initSQLite() error {
 	})
 
 	log.Info().
-		Str("path", c.cfg.Storage.SQLite.Path).
+		Str("path", c.cfg.SQLite.Path).
 		Msg("sqlite initialized")
 
 	return nil

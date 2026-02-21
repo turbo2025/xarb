@@ -27,7 +27,9 @@ type Config struct {
 	} `toml:"app"`
 
 	Symbols struct {
-		List []string `toml:"list"`
+		Coins []string `toml:"coins"` // 币种列表 (e.g., ["BTC", "ETH", "SOL"])
+		Quote string   `toml:"quote"` // 计价货币 (e.g., "USDT")
+		List  []string // 内部计算字段：合并后的符号列表 (e.g., ["BTCUSDT", "ETHUSDT", "SOLUSDT"])
 	} `toml:"symbols"`
 
 	Arbitrage struct {
@@ -98,10 +100,21 @@ func applyDefaults(cfg *Config) {
 }
 
 func validate(cfg *Config) error {
-	cfg.Symbols.List = normalizeSymbols(cfg.Symbols.List)
-	if len(cfg.Symbols.List) == 0 {
-		return errors.New("symbols.list is empty")
+	// 处理新的 coins + quote 格式
+	if len(cfg.Symbols.Coins) == 0 {
+		return errors.New("symbols.coins is empty")
 	}
+	if strings.TrimSpace(cfg.Symbols.Quote) == "" {
+		return errors.New("symbols.quote is empty")
+	}
+
+	// 将 coins 和 quote 合并为标准格式
+	quote := strings.ToUpper(strings.TrimSpace(cfg.Symbols.Quote))
+	mergedList := make([]string, len(cfg.Symbols.Coins))
+	for i, coin := range cfg.Symbols.Coins {
+		mergedList[i] = strings.ToUpper(strings.TrimSpace(coin)) + quote
+	}
+	cfg.Symbols.List = normalizeSymbols(mergedList)
 
 	// 验证所有启用的交易所都有必要的配置
 	for exchangeName, exchCfg := range cfg.Exchanges {

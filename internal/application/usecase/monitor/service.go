@@ -66,7 +66,7 @@ func (s *Service) Run(ctx context.Context) error {
 	// 记录监控配置
 	log.Info().
 		Strs("exchanges", s.deps.Exchanges).
-		Strs("symbols", s.deps.Symbols).
+		Strs("coins", s.deps.Symbols).
 		Int("feeds", len(s.deps.Feeds)).
 		Float64("delta_threshold", s.deps.DeltaThreshold).
 		Msg("✓ Monitor service initialized")

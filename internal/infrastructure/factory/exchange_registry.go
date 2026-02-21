@@ -2,7 +2,7 @@ package factory
 
 import (
 	"fmt"
-
+	"xarb/internal/application"
 	"xarb/internal/infrastructure/config"
 	"xarb/internal/infrastructure/exchange/binance"
 	"xarb/internal/infrastructure/exchange/bybit"
@@ -94,13 +94,13 @@ func (r *ExchangeClientRegistry) Register(exchangeName string, cfg *config.Excha
 		return fmt.Errorf("%s: PerpetualHttpURL and SpotHttpURL cannot be empty", exchangeName)
 	}
 	switch exchangeName {
-	case ExchangeBinance:
+	case application.ExchangeBinance:
 		return r.RegisterBinance(cfg)
-	case ExchangeBybit:
+	case application.ExchangeBybit:
 		return r.RegisterBybit(cfg)
-	case ExchangeOKX:
+	case application.ExchangeOKX:
 		return r.RegisterOKX(cfg)
-	case ExchangeBitget:
+	case application.ExchangeBitget:
 		return r.RegisterBitget(cfg)
 	default:
 		return fmt.Errorf("unknown exchange: %s", exchangeName)

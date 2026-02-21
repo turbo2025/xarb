@@ -8,21 +8,40 @@ import (
 	"strings"
 	"time"
 
+	"xarb/internal/application"
 	"xarb/internal/application/port"
+	"xarb/internal/infrastructure/exchange"
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
 
 type PerpetualTickerFeed struct {
-	wsURL string // e.g., wss://ws.okx.com:8443/ws/v5/public
+	wsURL     string                   // e.g., wss://ws.okx.com:8443/ws/v5/public
+	converter exchange.SymbolConverter // 符号转换器
 }
 
-func NewPerpetualTickerFeed(wsURL string) *PerpetualTickerFeed {
-	return &PerpetualTickerFeed{wsURL: strings.TrimSpace(wsURL)}
+// NewPerpetualTickerFeedWithQuote 使用自定义quote创建 OKX ticker feed
+func NewPerpetualTickerFeedWithQuote(wsURL string, quote string) *PerpetualTickerFeed {
+	return &PerpetualTickerFeed{
+		wsURL:     strings.TrimSpace(wsURL),
+		converter: exchange.NewCommonSymbolConverter(quote),
+	}
 }
 
-func (f *PerpetualTickerFeed) Name() string { return "OKX" }
+func (f *PerpetualTickerFeed) Name() string { return application.ExchangeOKX }
+
+// Symbol2Coin 将交易对转换为币种
+// 例: BTC-USDT-SWAP -> BTC, BTCUSDT -> BTC
+func (f *PerpetualTickerFeed) Symbol2Coin(symbol string) string {
+	return f.converter.Symbol2Coin(symbol)
+}
+
+// Coin2Symbol 将币种转换为交易对（OKX 格式）
+// 例: BTC -> BTC-USDT-SWAP
+func (f *PerpetualTickerFeed) Coin2Symbol(coin string) string {
+	return f.converter.Coin2Symbol(coin)
+}
 
 type okxSubReq struct {
 	Op   string      `json:"op"`
@@ -93,9 +112,11 @@ func (f *PerpetualTickerFeed) run(ctx context.Context, symbols []string, out cha
 			if sym == "" {
 				continue
 			}
+			// 转换符号格式为 OKX 期望的格式 (e.g., BTCUSDT -> BTC-USDT-SWAP)
+			okxSym := f.Coin2Symbol(sym)
 			args = append(args, okxSubArg{
 				Channel: "tickers",
-				InstID:  sym,
+				InstID:  okxSym,
 			})
 		}
 

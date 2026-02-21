@@ -1,4 +1,4 @@
-package factory
+package application
 
 // Exchange name constants
 const (

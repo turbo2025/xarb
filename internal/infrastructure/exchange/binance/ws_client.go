@@ -10,21 +10,28 @@ import (
 	"strings"
 	"time"
 
+	"xarb/internal/application"
 	"xarb/internal/application/port"
+	"xarb/internal/infrastructure/exchange"
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
 
 type PerpetualTickerFeed struct {
-	wsBase string // e.g. wss://fstream.binance.com
+	wsURL     string                   // e.g. wss://fstream.binance.com
+	converter exchange.SymbolConverter // 符号转换器
 }
 
-func NewPerpetualTickerFeed(wsBase string) *PerpetualTickerFeed {
-	return &PerpetualTickerFeed{wsBase: strings.TrimRight(strings.TrimSpace(wsBase), "/")}
+// NewPerpetualTickerFeedWithQuote Binance
+func NewPerpetualTickerFeedWithQuote(wsURL string, quote string) *PerpetualTickerFeed {
+	return &PerpetualTickerFeed{
+		wsURL:     strings.TrimSpace(wsURL),
+		converter: exchange.NewCommonSymbolConverter(quote),
+	}
 }
 
-func (f *PerpetualTickerFeed) Name() string { return "BINANCE" }
+func (f *PerpetualTickerFeed) Name() string { return application.ExchangeBinance }
 
 type binanceCombined struct {
 	Stream string         `json:"stream"`
@@ -36,7 +43,7 @@ type binanceMiniMsg struct {
 }
 
 func (f *PerpetualTickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
-	wsURL, err := buildCombinedURL(f.wsBase, symbols)
+	wsURL, err := buildCombinedURL(f.wsURL, symbols)
 	if err != nil {
 		return nil, err
 	}
