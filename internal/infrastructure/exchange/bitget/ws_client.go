@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"xarb/internal/application"
 	"xarb/internal/application/port"
 	"xarb/internal/infrastructure/exchange"
 
@@ -15,21 +16,27 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type PerpetualTickerFeed struct {
-	wsURL     string                   // e.g., wss://ws.bitget.com/spot/v1/public
-	converter exchange.SymbolConverter // 符号转换器
+// 包级别的符号转换器
+var symbolConverter exchange.SymbolConverter
+
+// InitializeConverter 初始化Bitget的符号转换器
+// 应在应用启动时调用，避免每次创建PerpetualTickerFeed时都初始化
+func InitializeConverter(quote string) {
+	symbolConverter = exchange.NewCommonSymbolConverter(quote)
 }
 
-// NewPerpetualTickerFeedWithQuote Bitget
-func NewPerpetualTickerFeedWithQuote(wsURL string, quote string) *PerpetualTickerFeed {
-	// Bitget使用标准的BTCUSDT格式，不需要quote参数
-	return &PerpetualTickerFeed{
-		wsURL:     strings.TrimSpace(wsURL),
-		converter: exchange.NewCommonSymbolConverter(quote),
+type TickerFeed struct {
+	wsURL string // e.g., wss://ws.bitget.com/spot/v1/public
+}
+
+// NewTickerFeed 创建 Bitget ticker feed
+func NewTickerFeed(wsURL string) *TickerFeed {
+	return &TickerFeed{
+		wsURL: strings.TrimSpace(wsURL),
 	}
 }
 
-func (f *PerpetualTickerFeed) Name() string { return "BITGET" }
+func (f *TickerFeed) Name() string { return application.ExchangeBitget }
 
 type bitgetSubReq struct {
 	Op   string         `json:"op"`
@@ -54,7 +61,7 @@ type bitgetTickerData struct {
 	Ts     string `json:"ts"`
 }
 
-func (f *PerpetualTickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
+func (f *TickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
 	if f.wsURL == "" {
 		return nil, errors.New("bitget wsURL empty")
 	}
@@ -67,7 +74,7 @@ func (f *PerpetualTickerFeed) Subscribe(ctx context.Context, symbols []string) (
 	return out, nil
 }
 
-func (f *PerpetualTickerFeed) run(ctx context.Context, symbols []string, out chan<- port.Tick) {
+func (f *TickerFeed) run(ctx context.Context, symbols []string, out chan<- port.Tick) {
 	defer close(out)
 
 	backoff := 500 * time.Millisecond

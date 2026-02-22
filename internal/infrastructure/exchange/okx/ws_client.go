@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -16,32 +17,28 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type PerpetualTickerFeed struct {
-	wsURL     string                   // e.g., wss://ws.okx.com:8443/ws/v5/public
-	converter exchange.SymbolConverter // 符号转换器
+// 包级别的符号转换器
+var symbolConverter exchange.SymbolConverter
+
+// InitializeConverter 初始化OKX的符号转换器
+// 应在应用启动时调用，避免每次创建TickerFeed时都初始化
+func InitializeConverter(quote string) {
+	suffix := fmt.Sprintf("-%s-SWAP", quote)
+	symbolConverter = exchange.NewCommonSymbolConverter(suffix)
 }
 
-// NewPerpetualTickerFeedWithQuote 使用自定义quote创建 OKX ticker feed
-func NewPerpetualTickerFeedWithQuote(wsURL string, quote string) *PerpetualTickerFeed {
-	return &PerpetualTickerFeed{
-		wsURL:     strings.TrimSpace(wsURL),
-		converter: exchange.NewCommonSymbolConverter(quote),
+type TickerFeed struct {
+	wsURL string // e.g., wss://ws.okx.com:8443/ws/v5/public
+}
+
+// NewTickerFeed 创建 OKX ticker feed
+func NewTickerFeed(wsURL string) *TickerFeed {
+	return &TickerFeed{
+		wsURL: strings.TrimSpace(wsURL),
 	}
 }
 
-func (f *PerpetualTickerFeed) Name() string { return application.ExchangeOKX }
-
-// Symbol2Coin 将交易对转换为币种
-// 例: BTC-USDT-SWAP -> BTC, BTCUSDT -> BTC
-func (f *PerpetualTickerFeed) Symbol2Coin(symbol string) string {
-	return f.converter.Symbol2Coin(symbol)
-}
-
-// Coin2Symbol 将币种转换为交易对（OKX 格式）
-// 例: BTC -> BTC-USDT-SWAP
-func (f *PerpetualTickerFeed) Coin2Symbol(coin string) string {
-	return f.converter.Coin2Symbol(coin)
-}
+func (f *TickerFeed) Name() string { return application.ExchangeOKX }
 
 type okxSubReq struct {
 	Op   string      `json:"op"`
@@ -65,7 +62,7 @@ type okxTickerData struct {
 	Ts     string `json:"ts"`
 }
 
-func (f *PerpetualTickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
+func (f *TickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
 	if f.wsURL == "" {
 		return nil, errors.New("okx wsURL empty")
 	}
@@ -78,7 +75,7 @@ func (f *PerpetualTickerFeed) Subscribe(ctx context.Context, symbols []string) (
 	return out, nil
 }
 
-func (f *PerpetualTickerFeed) run(ctx context.Context, symbols []string, out chan<- port.Tick) {
+func (f *TickerFeed) run(ctx context.Context, symbols []string, out chan<- port.Tick) {
 	defer close(out)
 
 	backoff := 500 * time.Millisecond
@@ -112,11 +109,9 @@ func (f *PerpetualTickerFeed) run(ctx context.Context, symbols []string, out cha
 			if sym == "" {
 				continue
 			}
-			// 转换符号格式为 OKX 期望的格式 (e.g., BTCUSDT -> BTC-USDT-SWAP)
-			okxSym := f.Coin2Symbol(sym)
 			args = append(args, okxSubArg{
 				Channel: "tickers",
-				InstID:  okxSym,
+				InstID:  sym,
 			})
 		}
 

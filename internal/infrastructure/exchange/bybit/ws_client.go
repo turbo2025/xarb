@@ -17,33 +17,27 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type PerpetualTickerFeed struct {
-	wsURL     string                   // e.g. wss://stream.bybit.com/v5/public/linear
-	converter exchange.SymbolConverter // 符号转换器
+// 包级别的符号转换器
+var symbolConverter exchange.SymbolConverter
+
+// InitializeConverter 初始化Bybit的符号转换器
+// 应在应用启动时调用，避免每次创建TickerFeed时都初始化
+func InitializeConverter(quote string) {
+	symbolConverter = exchange.NewCommonSymbolConverter(quote)
 }
 
-// NewPerpetualTickerFeedWithQuote 使用自定义quote创建 Bybit ticker feed
-func NewPerpetualTickerFeedWithQuote(wsURL string, quote string) *PerpetualTickerFeed {
+type TickerFeed struct {
+	wsURL string // e.g. wss://stream.bybit.com/v5/public/linear
+}
 
-	return &PerpetualTickerFeed{
-		wsURL:     strings.TrimSpace(wsURL),
-		converter: exchange.NewCommonSymbolConverter(quote),
+// NewTickerFeed 使用自定义quote创建 Bybit ticker feed，使用包级别的转换器
+func NewTickerFeed(wsURL string) *TickerFeed {
+	return &TickerFeed{
+		wsURL: strings.TrimSpace(wsURL),
 	}
 }
 
-func (f *PerpetualTickerFeed) Name() string { return application.ExchangeBybit }
-
-// Symbol2Coin 将交易对转换为币种
-// 例: BTCUSDT -> BTC
-func (f *PerpetualTickerFeed) Symbol2Coin(symbol string) string {
-	return f.converter.Symbol2Coin(symbol)
-}
-
-// Coin2Symbol 将币种转换为交易对
-// 例: BTC -> BTCUSDT
-func (f *PerpetualTickerFeed) Coin2Symbol(coin string) string {
-	return f.converter.Coin2Symbol(coin)
-}
+func (f *TickerFeed) Name() string { return application.ExchangeBybit }
 
 type bybitSubReq struct {
 	Op   string   `json:"op"`
@@ -106,7 +100,7 @@ type bybitTickerMsg struct {
 	Op      string `json:"op,omitempty"`
 }
 
-func (f *PerpetualTickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
+func (f *TickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
 	if f.wsURL == "" {
 		return nil, errors.New("bybit ws_url empty")
 	}
@@ -132,7 +126,7 @@ func buildTopics(symbols []string) []string {
 	return out
 }
 
-func (f *PerpetualTickerFeed) run(ctx context.Context, topics []string, out chan<- port.Tick) {
+func (f *TickerFeed) run(ctx context.Context, topics []string, out chan<- port.Tick) {
 	defer close(out)
 
 	backoff := 500 * time.Millisecond

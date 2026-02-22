@@ -18,20 +18,27 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type PerpetualTickerFeed struct {
-	wsURL     string                   // e.g. wss://fstream.binance.com
-	converter exchange.SymbolConverter // 符号转换器
+// 包级别的符号转换器
+var symbolConverter exchange.SymbolConverter
+
+// InitializeConverter 初始化Binance的符号转换器
+// 应在应用启动时调用，避免每次创建PerpetualTickerFeed时都初始化
+func InitializeConverter(quote string) {
+	symbolConverter = exchange.NewCommonSymbolConverter(quote)
 }
 
-// NewPerpetualTickerFeedWithQuote Binance
-func NewPerpetualTickerFeedWithQuote(wsURL string, quote string) *PerpetualTickerFeed {
-	return &PerpetualTickerFeed{
-		wsURL:     strings.TrimSpace(wsURL),
-		converter: exchange.NewCommonSymbolConverter(quote),
+type TickerFeed struct {
+	wsURL string // e.g. wss://fstream.binance.com
+}
+
+// NewTickerFeed 使用自定义quote创建 Binance ticker feed，使用包级别的转换器
+func NewTickerFeed(wsURL string) *TickerFeed {
+	return &TickerFeed{
+		wsURL: strings.TrimSpace(wsURL),
 	}
 }
 
-func (f *PerpetualTickerFeed) Name() string { return application.ExchangeBinance }
+func (f *TickerFeed) Name() string { return application.ExchangeBinance }
 
 type binanceCombined struct {
 	Stream string         `json:"stream"`
@@ -42,7 +49,7 @@ type binanceMiniMsg struct {
 	Close  string `json:"c"`
 }
 
-func (f *PerpetualTickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
+func (f *TickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
 	wsURL, err := buildCombinedURL(f.wsURL, symbols)
 	if err != nil {
 		return nil, err
@@ -82,7 +89,7 @@ func buildCombinedURL(base string, symbols []string) (string, error) {
 	return u.String(), nil
 }
 
-func (f *PerpetualTickerFeed) run(ctx context.Context, wsURL string, out chan<- port.Tick) {
+func (f *TickerFeed) run(ctx context.Context, wsURL string, out chan<- port.Tick) {
 	defer close(out)
 
 	backoff := 500 * time.Millisecond

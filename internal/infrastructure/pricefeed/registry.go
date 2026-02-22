@@ -6,17 +6,16 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// FactoryWithQuote 定义带quote参数的price feed factory函数类型
+// factory函数类型
 // wsURL: WebSocket连接URL
-// quote: 计价货币 (e.g., "USDT")
-type FactoryWithQuote func(wsURL string, quote string) port.PriceFeed
+type Factory func(wsURL string) port.PriceFeed
 
 // registry maps exchange names to their respective price feed factories
-var registry = make(map[string]FactoryWithQuote)
+var registry = make(map[string]Factory)
 
-// Register 注册一个price feed factory for an exchange (使用新的FactoryWithQuote类型)
+// Register 注册一个price feed factory for an exchange (使用新的Factory类型)
 // 这是由各个交易所包的init()函数调用来自注册的
-func Register(exchangeName string, factory FactoryWithQuote) {
+func Register(exchangeName string, factory Factory) {
 	if factory == nil {
 		log.Warn().Str("exchange", exchangeName).Msg("invalid price feed factory")
 		return
@@ -29,7 +28,7 @@ func Register(exchangeName string, factory FactoryWithQuote) {
 }
 
 // Get 获取已注册的price feed factory for给定的exchange名称
-func Get(exchangeName string) (FactoryWithQuote, bool) {
+func Get(exchangeName string) (Factory, bool) {
 	factory, ok := registry[exchangeName]
 	return factory, ok
 }

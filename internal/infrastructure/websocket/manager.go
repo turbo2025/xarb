@@ -7,8 +7,13 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"xarb/internal/application"
 	"xarb/internal/application/port"
 	"xarb/internal/infrastructure/config"
+	"xarb/internal/infrastructure/exchange/binance"
+	"xarb/internal/infrastructure/exchange/bitget"
+	"xarb/internal/infrastructure/exchange/bybit"
+	"xarb/internal/infrastructure/exchange/okx"
 	"xarb/internal/infrastructure/pricefeed"
 )
 
@@ -63,9 +68,9 @@ func (m *WebSocketManager) Initialize(cfg *config.Config) error {
 
 	// 获取配置的quote（计价货币）
 	quote := strings.TrimSpace(cfg.Symbols.Quote)
-	if quote == "" {
-		quote = "USDT" // 默认使用 USDT
-	}
+
+	// 为各交易所初始化符号转换器（一次性初始化，避免重复）
+	initializeExchangeConverters(quote, enabledExchanges)
 
 	// 定义要初始化的交易类型配置
 	type tradeTypeConfig struct {
@@ -79,8 +84,8 @@ func (m *WebSocketManager) Initialize(cfg *config.Config) error {
 
 		// 遍历所有交易类型（Spot 和 Perpetual），避免重复代码
 		configs := []tradeTypeConfig{
-			{name: "spot", wsURL: exchCfg.SpotWsURL, clients: m.spotClients},
-			{name: "perpetual", wsURL: exchCfg.PerpetualWsURL, clients: m.perpetualClients},
+			{name: application.TradeTypeSpot, wsURL: exchCfg.SpotWsURL, clients: m.spotClients},
+			{name: application.TradeTypePerpetual, wsURL: exchCfg.PerpetualWsURL, clients: m.perpetualClients},
 		}
 
 		for _, tc := range configs {
@@ -153,7 +158,7 @@ func (m *WebSocketManager) registerWebSocket(exchangeName string, wsURL string, 
 		return fmt.Errorf("price feed factory not registered for exchange: %s", exchangeName)
 	}
 
-	priceFeed := factory(wsURL, quote)
+	priceFeed := factory(wsURL)
 	clients[exchangeName] = &WebSocketClients{PriceFeed: priceFeed}
 	log.Info().Str("exchange", exchangeName).Msg("✓ " + exchangeName + " " + tradeType + " websocket initialized")
 	return nil
@@ -169,4 +174,21 @@ func (m *WebSocketManager) GetSpotClient(exchangeName string) *WebSocketClients 
 // GetPerpetualClient 获取指定交易所的永续合约 WebSocket 客户端
 func (m *WebSocketManager) GetPerpetualClient(exchangeName string) *WebSocketClients {
 	return m.perpetualClients[exchangeName]
+}
+
+// initializeExchangeConverters 为各交易所初始化符号转换器
+// 这样可以避免在每次创建 PriceFeed 时都重新初始化 converter
+func initializeExchangeConverters(quote string, enabledExchanges []string) {
+	for _, exchangeName := range enabledExchanges {
+		switch exchangeName {
+		case application.ExchangeOKX:
+			okx.InitializeConverter(quote)
+		case application.ExchangeBybit:
+			bybit.InitializeConverter(quote)
+		case application.ExchangeBinance:
+			binance.InitializeConverter(quote)
+		case application.ExchangeBitget:
+			bitget.InitializeConverter(quote)
+		}
+	}
 }
