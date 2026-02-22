@@ -84,7 +84,7 @@ func (m *WebSocketManager) Initialize(cfg *config.Config) error {
 
 		// 遍历所有交易类型（Spot 和 Perpetual），避免重复代码
 		configs := []tradeTypeConfig{
-			{name: application.TradeTypeSpot, wsURL: exchCfg.SpotWsURL, clients: m.spotClients},
+			// {name: application.TradeTypeSpot, wsURL: exchCfg.SpotWsURL, clients: m.spotClients},
 			{name: application.TradeTypePerpetual, wsURL: exchCfg.PerpetualWsURL, clients: m.perpetualClients},
 		}
 

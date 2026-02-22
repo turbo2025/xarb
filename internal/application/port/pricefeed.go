@@ -12,5 +12,5 @@ type Tick struct {
 
 type PriceFeed interface {
 	Name() string
-	Subscribe(ctx context.Context, symbols []string) (<-chan Tick, error)
+	Subscribe(ctx context.Context, coins []string) (<-chan Tick, error)
 }

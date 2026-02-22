@@ -61,12 +61,24 @@ type bitgetTickerData struct {
 	Ts     string `json:"ts"`
 }
 
-func (f *TickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
+func (f *TickerFeed) Subscribe(ctx context.Context, coins []string) (<-chan port.Tick, error) {
 	if f.wsURL == "" {
 		return nil, errors.New("bitget wsURL empty")
 	}
-	if len(symbols) == 0 {
-		return nil, errors.New("symbols empty")
+	if len(coins) == 0 {
+		return nil, errors.New("coins empty")
+	}
+
+	// 将币种转换为 Bitget 格式的交易对 (e.g., BTC -> BTCUSDT)
+	symbols := make([]string, 0, len(coins))
+	for _, coin := range coins {
+		coin = strings.TrimSpace(coin)
+		if coin == "" {
+			continue
+		}
+		// 使用 symbolConverter 转换为交易所特定格式
+		symbol := symbolConverter.Coin2Symbol(coin)
+		symbols = append(symbols, symbol)
 	}
 
 	out := make(chan port.Tick, 1024)

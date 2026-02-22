@@ -18,7 +18,7 @@ type PriceFeed = port.PriceFeed
 
 type ServiceDeps struct {
 	Feeds          []PriceFeed
-	Symbols        []string
+	Coins          []string // 原始的币种列表，由 feed 实现转换为交易所特定格式
 	PrintEveryMin  int
 	DeltaThreshold float64
 	Exchanges      []string // 要显示的交易所列表（可选），如果为空则显示所有
@@ -50,10 +50,10 @@ func NewService(deps ServiceDeps) *Service {
 	}
 	return &Service{
 		deps:     deps,
-		st:       NewState(deps.Symbols),
+		st:       NewState(deps.Coins),
 		fmt:      formatter,
-		lastBand: make(map[string]int, len(deps.Symbols)),
-		seenBand: make(map[string]bool, len(deps.Symbols)),
+		lastBand: make(map[string]int, len(deps.Coins)),
+		seenBand: make(map[string]bool, len(deps.Coins)),
 		prices:   make(map[string]map[string]float64), // symbol -> exchange -> price
 	}
 }
@@ -66,7 +66,7 @@ func (s *Service) Run(ctx context.Context) error {
 	// 记录监控配置
 	log.Info().
 		Strs("exchanges", s.deps.Exchanges).
-		Strs("coins", s.deps.Symbols).
+		Strs("coins", s.deps.Coins).
 		Int("feeds", len(s.deps.Feeds)).
 		Float64("delta_threshold", s.deps.DeltaThreshold).
 		Msg("✓ Monitor service initialized")
@@ -89,7 +89,7 @@ func (s *Service) Run(ctx context.Context) error {
 
 	// start feeds
 	for _, feed := range s.deps.Feeds {
-		ch, err := feed.Subscribe(ctx, s.deps.Symbols)
+		ch, err := feed.Subscribe(ctx, s.deps.Coins)
 		if err != nil {
 			return err
 		}

@@ -62,20 +62,20 @@ type okxTickerData struct {
 	Ts     string `json:"ts"`
 }
 
-func (f *TickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
+func (f *TickerFeed) Subscribe(ctx context.Context, coins []string) (<-chan port.Tick, error) {
 	if f.wsURL == "" {
 		return nil, errors.New("okx wsURL empty")
 	}
-	if len(symbols) == 0 {
-		return nil, errors.New("symbols empty")
+	if len(coins) == 0 {
+		return nil, errors.New("coins empty")
 	}
 
 	out := make(chan port.Tick, 1024)
-	go f.run(ctx, symbols, out)
+	go f.run(ctx, coins, out)
 	return out, nil
 }
 
-func (f *TickerFeed) run(ctx context.Context, symbols []string, out chan<- port.Tick) {
+func (f *TickerFeed) run(ctx context.Context, coins []string, out chan<- port.Tick) {
 	defer close(out)
 
 	backoff := 500 * time.Millisecond
@@ -103,15 +103,18 @@ func (f *TickerFeed) run(ctx context.Context, symbols []string, out chan<- port.
 		log.Info().Str("feed", f.Name()).Msg("ws connected")
 
 		// Subscribe to ticker channels
-		args := make([]okxSubArg, 0, len(symbols))
-		for _, sym := range symbols {
-			sym = strings.TrimSpace(sym)
-			if sym == "" {
+		// 将币种转换为 OKX 格式的交易对 (e.g., BTC -> BTC-USDT-SWAP)
+		args := make([]okxSubArg, 0, len(coins))
+		for _, coin := range coins {
+			coin = strings.TrimSpace(coin)
+			if coin == "" {
 				continue
 			}
+			// 将币种转换为 OKX 格式的交易对 (e.g., BTC -> BTC-USDT-SWAP)
+			instID := symbolConverter.Coin2Symbol(coin)
 			args = append(args, okxSubArg{
 				Channel: "tickers",
-				InstID:  sym,
+				InstID:  instID,
 			})
 		}
 
@@ -121,16 +124,27 @@ func (f *TickerFeed) run(ctx context.Context, symbols []string, out chan<- port.
 				Args: args,
 			}
 			if b, err := json.Marshal(subReq); err == nil {
-				_ = conn.WriteMessage(websocket.TextMessage, b)
+				if err := conn.WriteMessage(websocket.TextMessage, b); err != nil {
+					log.Error().Str("feed", f.Name()).Err(err).Msg("failed to send subscribe message")
+				} else {
+					log.Info().Str("feed", f.Name()).Int("count", len(args)).Msg("subscribed to tickers")
+				}
+			} else {
+				log.Error().Str("feed", f.Name()).Err(err).Msg("failed to marshal subscribe message")
 			}
+		} else {
+			log.Warn().Str("feed", f.Name()).Msg("no valid args for subscription")
 		}
 
 		err = readLoop(ctx, conn, func(b []byte) {
 			var msg okxTickerMsg
 			if e := json.Unmarshal(b, &msg); e != nil {
-				log.Error().Str("feed", f.Name()).Err(e).Msg("json unmarshal failed")
+				log.Debug().Str("feed", f.Name()).Err(e).RawJSON("data", b).Msg("json unmarshal failed")
 				return
 			}
+
+			// Log all received messages for debugging
+			log.Debug().Str("feed", f.Name()).Str("op", msg.Op).Int("data_len", len(msg.Data)).Msg("received message")
 
 			// Only process data messages with ticker info
 			if len(msg.Data) == 0 {

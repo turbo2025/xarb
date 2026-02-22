@@ -100,11 +100,23 @@ type bybitTickerMsg struct {
 	Op      string `json:"op,omitempty"`
 }
 
-func (f *TickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
+func (f *TickerFeed) Subscribe(ctx context.Context, coins []string) (<-chan port.Tick, error) {
 	if f.wsURL == "" {
 		return nil, errors.New("bybit ws_url empty")
 	}
-	topics := buildTopics(symbols)
+
+	// 将币种转换为 Bybit 格式的交易对 (e.g., BTC -> BTCUSDT)
+	topics := make([]string, 0, len(coins))
+	for _, coin := range coins {
+		coin = strings.TrimSpace(coin)
+		if coin == "" {
+			continue
+		}
+		// 使用 symbolConverter 转换为交易所特定格式
+		symbol := symbolConverter.Coin2Symbol(coin)
+		topics = append(topics, "tickers."+strings.ToUpper(symbol))
+	}
+
 	if len(topics) == 0 {
 		return nil, errors.New("no valid symbols for bybit topics")
 	}
@@ -112,18 +124,6 @@ func (f *TickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan po
 	out := make(chan port.Tick, 1024)
 	go f.run(ctx, topics, out)
 	return out, nil
-}
-
-func buildTopics(symbols []string) []string {
-	out := make([]string, 0, len(symbols))
-	for _, s := range symbols {
-		u := strings.ToUpper(strings.TrimSpace(s))
-		if u == "" {
-			continue
-		}
-		out = append(out, "tickers."+u)
-	}
-	return out
 }
 
 func (f *TickerFeed) run(ctx context.Context, topics []string, out chan<- port.Tick) {

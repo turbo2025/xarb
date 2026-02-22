@@ -213,7 +213,7 @@ func (sc *ServiceContext) BuildMonitorServiceDeps() monitor.ServiceDeps {
 	return monitor.ServiceDeps{
 		Exchanges:      enabledExchanges, // 使用从config中获取的enabled交易所列表
 		Feeds:          sc.priceFeeds,
-		Symbols:        sc.Config.Symbols.List,
+		Coins:          sc.Config.Symbols.Coins, // 原始币种列表，由feed转换为交易所特定格式
 		PrintEveryMin:  sc.Config.App.PrintEveryMin,
 		DeltaThreshold: sc.Config.Arbitrage.DeltaThreshold,
 		Sink:           sc.Sink,

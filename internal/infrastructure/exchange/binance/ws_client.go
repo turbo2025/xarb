@@ -49,7 +49,19 @@ type binanceMiniMsg struct {
 	Close  string `json:"c"`
 }
 
-func (f *TickerFeed) Subscribe(ctx context.Context, symbols []string) (<-chan port.Tick, error) {
+func (f *TickerFeed) Subscribe(ctx context.Context, coins []string) (<-chan port.Tick, error) {
+	// 将币种转换为 Binance 格式的交易对 (e.g., BTC -> BTCUSDT)
+	symbols := make([]string, 0, len(coins))
+	for _, coin := range coins {
+		coin = strings.TrimSpace(coin)
+		if coin == "" {
+			continue
+		}
+		// 使用 symbolConverter 转换为交易所特定格式
+		symbol := symbolConverter.Coin2Symbol(coin)
+		symbols = append(symbols, symbol)
+	}
+
 	wsURL, err := buildCombinedURL(f.wsURL, symbols)
 	if err != nil {
 		return nil, err
