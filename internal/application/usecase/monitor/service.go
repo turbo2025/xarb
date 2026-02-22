@@ -93,7 +93,7 @@ func (s *Service) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		go func(name string, in <-chan port.Tick) {
+		go func(f port.PriceFeed, in <-chan port.Tick) {
 			for {
 				select {
 				case <-ctx.Done():
@@ -102,10 +102,20 @@ func (s *Service) Run(ctx context.Context) error {
 					if !ok {
 						return
 					}
-					merged <- t
+					// 使用 feed 的转换器将交易对转换为币种
+					coin := f.Symbol2Coin(t.Symbol)
+					if coin == "" {
+						log.Warn().Str("feed", f.Name()).Str("symbol", t.Symbol).Msg("failed to convert symbol to coin")
+						continue
+					}
+					// 创建币种级别的 Tick
+					tCoin := t
+					tCoin.Symbol = coin
+					log.Debug().Str("feed", f.Name()).Str("symbol", t.Symbol).Str("coin", coin).Str("price", t.PriceStr).Msg("converted symbol to coin")
+					merged <- tCoin
 				}
 			}
-		}(feed.Name(), ch)
+		}(feed, ch)
 
 		log.Info().Str("feed", feed.Name()).Msg("feed started")
 	}
@@ -132,16 +142,23 @@ func (s *Service) Run(ctx context.Context) error {
 			}
 
 		case t := <-merged:
+			// 使用 feed 的转换器将交易对转换为币种
+			coin := t.Symbol // 现在 Symbol 已经是币种了（在前面 goroutine 中转换过）
+			price := t.PriceStr
+
 			// 保存价格到缓存
 			s.pricesLock.Lock()
-			if s.prices[t.Symbol] == nil {
-				s.prices[t.Symbol] = make(map[string]float64)
+			if s.prices[coin] == nil {
+				s.prices[coin] = make(map[string]float64)
 			}
-			s.prices[t.Symbol][t.Exchange] = t.PriceNum
+			s.prices[coin][t.Exchange] = t.PriceNum
 			s.pricesLock.Unlock()
+
+			log.Debug().Str("coin", coin).Str("exchange", t.Exchange).Str("price", price).Msg("received tick")
 
 			changed := s.st.Apply(t)
 			if changed {
+				log.Debug().Str("coin", coin).Msg("price changed")
 				line := s.fmt.Render(s.st, RenderLive)
 				_ = s.deps.Sink.WriteLive(line)
 			}

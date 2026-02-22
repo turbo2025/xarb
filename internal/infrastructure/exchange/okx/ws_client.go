@@ -40,6 +40,14 @@ func NewTickerFeed(wsURL string) *TickerFeed {
 
 func (f *TickerFeed) Name() string { return application.ExchangeOKX }
 
+// Symbol2Coin 将 OKX 格式的交易对转换为币种
+func (f *TickerFeed) Symbol2Coin(symbol string) string {
+	if symbolConverter == nil {
+		return ""
+	}
+	return symbolConverter.Symbol2Coin(symbol)
+}
+
 type okxSubReq struct {
 	Op   string      `json:"op"`
 	Args []okxSubArg `json:"args"`
@@ -116,6 +124,7 @@ func (f *TickerFeed) run(ctx context.Context, coins []string, out chan<- port.Ti
 				Channel: "tickers",
 				InstID:  instID,
 			})
+			log.Debug().Str("feed", f.Name()).Str("coin", coin).Str("instID", instID).Msg("preparing subscription")
 		}
 
 		if len(args) > 0 {
@@ -124,6 +133,7 @@ func (f *TickerFeed) run(ctx context.Context, coins []string, out chan<- port.Ti
 				Args: args,
 			}
 			if b, err := json.Marshal(subReq); err == nil {
+				log.Debug().Str("feed", f.Name()).RawJSON("request", b).Msg("sending subscribe request")
 				if err := conn.WriteMessage(websocket.TextMessage, b); err != nil {
 					log.Error().Str("feed", f.Name()).Err(err).Msg("failed to send subscribe message")
 				} else {
@@ -155,10 +165,15 @@ func (f *TickerFeed) run(ctx context.Context, coins []string, out chan<- port.Ti
 				sym := strings.TrimSpace(data.InstID)
 				pxs := strings.TrimSpace(data.Last)
 				if sym == "" || pxs == "" {
+					log.Debug().Str("feed", f.Name()).Str("sym", sym).Str("price", pxs).Msg("skipping empty fields")
 					continue
 				}
 
-				pxn, _ := strconv.ParseFloat(pxs, 64)
+				pxn, err := strconv.ParseFloat(pxs, 64)
+				if err != nil {
+					log.Warn().Str("feed", f.Name()).Str("price_str", pxs).Err(err).Msg("failed to parse price")
+					continue
+				}
 
 				// Parse timestamp if available
 				ts := time.Now().UnixMilli()
@@ -168,13 +183,15 @@ func (f *TickerFeed) run(ctx context.Context, coins []string, out chan<- port.Ti
 					}
 				}
 
-				out <- port.Tick{
+				tick := port.Tick{
 					Exchange: f.Name(),
 					Symbol:   sym,
 					PriceStr: pxs,
 					PriceNum: pxn,
 					Ts:       ts,
 				}
+				log.Debug().Str("feed", f.Name()).Str("symbol", sym).Float64("price", pxn).Msg("sending tick")
+				out <- tick
 			}
 		})
 
@@ -203,12 +220,18 @@ func readLoop(ctx context.Context, conn *websocket.Conn, onMsg func([]byte)) err
 	errCh := make(chan error, 1)
 	go func() {
 		defer close(errCh)
+		msgCount := 0
 		for {
 			_, b, err := conn.ReadMessage()
 			if err == nil {
 				_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+				msgCount++
+				if msgCount%100 == 1 { // Log every 100 messages to avoid spam
+					log.Debug().Int("msg_count", msgCount).Int("bytes", len(b)).Msg("received raw message")
+				}
 			}
 			if err != nil {
+				log.Error().Int("total_msgs", msgCount).Err(err).Msg("readLoop error")
 				errCh <- err
 				return
 			}

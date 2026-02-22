@@ -40,6 +40,14 @@ func NewTickerFeed(wsURL string) *TickerFeed {
 
 func (f *TickerFeed) Name() string { return application.ExchangeBinance }
 
+// Symbol2Coin 将 Binance 格式的交易对转换为币种
+func (f *TickerFeed) Symbol2Coin(symbol string) string {
+	if symbolConverter == nil {
+		return ""
+	}
+	return symbolConverter.Symbol2Coin(symbol)
+}
+
 type binanceCombined struct {
 	Stream string         `json:"stream"`
 	Data   binanceMiniMsg `json:"data"`

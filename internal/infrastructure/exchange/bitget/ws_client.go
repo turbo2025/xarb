@@ -38,6 +38,14 @@ func NewTickerFeed(wsURL string) *TickerFeed {
 
 func (f *TickerFeed) Name() string { return application.ExchangeBitget }
 
+// Symbol2Coin 将 Bitget 格式的交易对转换为币种
+func (f *TickerFeed) Symbol2Coin(symbol string) string {
+	if symbolConverter == nil {
+		return ""
+	}
+	return symbolConverter.Symbol2Coin(symbol)
+}
+
 type bitgetSubReq struct {
 	Op   string         `json:"op"`
 	Args []bitgetSubArg `json:"args"`

@@ -39,6 +39,14 @@ func NewTickerFeed(wsURL string) *TickerFeed {
 
 func (f *TickerFeed) Name() string { return application.ExchangeBybit }
 
+// Symbol2Coin 将 Bybit 格式的交易对转换为币种
+func (f *TickerFeed) Symbol2Coin(symbol string) string {
+	if symbolConverter == nil {
+		return ""
+	}
+	return symbolConverter.Symbol2Coin(symbol)
+}
+
 type bybitSubReq struct {
 	Op   string   `json:"op"`
 	Args []string `json:"args"`
@@ -114,7 +122,9 @@ func (f *TickerFeed) Subscribe(ctx context.Context, coins []string) (<-chan port
 		}
 		// 使用 symbolConverter 转换为交易所特定格式
 		symbol := symbolConverter.Coin2Symbol(coin)
-		topics = append(topics, "tickers."+strings.ToUpper(symbol))
+		topic := "tickers." + strings.ToUpper(symbol)
+		topics = append(topics, topic)
+		log.Debug().Str("feed", f.Name()).Str("coin", coin).Str("symbol", symbol).Str("topic", topic).Msg("preparing subscription")
 	}
 
 	if len(topics) == 0 {
@@ -160,15 +170,19 @@ func (f *TickerFeed) run(ctx context.Context, topics []string, out chan<- port.T
 			continue
 		}
 
+		log.Info().Str("feed", f.Name()).Int("count", len(topics)).Msg("subscribed to topics")
+
 		backoff = 500 * time.Millisecond
 		log.Info().Str("feed", f.Name()).Msg("ws connected & subscribed")
 
 		err = readLoop(ctx, conn, func(b []byte) {
 			var msg bybitTickerMsg
 			if e := json.Unmarshal(b, &msg); e != nil {
-				log.Error().Str("feed", f.Name()).Err(e).Msg("json unmarshal failed")
+				log.Info().Str("feed", f.Name()).Err(e).RawJSON("data", b).Msg("json unmarshal failed")
 				return
 			}
+
+			log.Debug().Str("feed", f.Name()).Str("topic", msg.Topic).Str("type", msg.Type).Int("data_len", len(msg.Data)).Msg("received message")
 
 			// ack
 			if msg.Success != nil {
@@ -186,9 +200,15 @@ func (f *TickerFeed) run(ctx context.Context, topics []string, out chan<- port.T
 				sym := strings.ToUpper(strings.TrimSpace(d.Symbol))
 				pxs := strings.TrimSpace(d.LastPrice)
 				if sym == "" || pxs == "" {
+					log.Debug().Str("feed", f.Name()).Str("sym", sym).Str("price", pxs).Msg("skipping empty fields")
 					continue
 				}
-				pxn, _ := strconv.ParseFloat(pxs, 64)
+				pxn, err := strconv.ParseFloat(pxs, 64)
+				if err != nil {
+					log.Warn().Str("feed", f.Name()).Str("price_str", pxs).Err(err).Msg("failed to parse price")
+					continue
+				}
+				log.Debug().Str("feed", f.Name()).Str("symbol", sym).Float64("price", pxn).Msg("sending tick")
 				out <- port.Tick{
 					Exchange: f.Name(),
 					Symbol:   sym,

@@ -13,4 +13,7 @@ type Tick struct {
 type PriceFeed interface {
 	Name() string
 	Subscribe(ctx context.Context, coins []string) (<-chan Tick, error)
+	// Symbol2Coin 将交易所特定格式的交易对转换为币种
+	// 例: BTC-USDT-SWAP -> BTC, BTCUSDT -> BTC
+	Symbol2Coin(symbol string) string
 }

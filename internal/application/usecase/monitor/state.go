@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
 	"xarb/internal/application/port"
 )
 
@@ -36,11 +35,11 @@ type State struct {
 	syms  map[string]*symState
 }
 
-func NewState(symbols []string) *State {
-	order := make([]string, 0, len(symbols))
-	syms := make(map[string]*symState, len(symbols))
-	for _, s := range symbols {
-		u := strings.ToUpper(strings.TrimSpace(s))
+func NewState(coins []string) *State {
+	order := make([]string, 0, len(coins))
+	syms := make(map[string]*symState, len(coins))
+	for _, coin := range coins {
+		u := strings.ToUpper(strings.TrimSpace(coin))
 		if u == "" {
 			continue
 		}
@@ -56,19 +55,20 @@ func (s *State) Symbols() []string {
 	return s.order
 }
 
-// Apply returns true if the displayed price string changed (so we should redraw)
+// Apply 应用一个币种的价格更新，返回是否显示更新（相对于前一个价格发生了变化）
+// Tick 中的 Symbol 应该是币种名称（如 "BTC", "ETH"），而不是交易对格式
 func (s *State) Apply(t port.Tick) bool {
 	ex := strings.ToUpper(strings.TrimSpace(t.Exchange))
-	sym := strings.ToUpper(strings.TrimSpace(t.Symbol))
+	coin := strings.ToUpper(strings.TrimSpace(t.Symbol)) // Symbol 应该是币种，非交易对
 	price := strings.TrimSpace(t.PriceStr)
-	if sym == "" || price == "" || ex == "" {
+	if coin == "" || price == "" || ex == "" {
 		return false
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	st := s.syms[sym]
+	st := s.syms[coin]
 	if st == nil {
 		return false
 	}
