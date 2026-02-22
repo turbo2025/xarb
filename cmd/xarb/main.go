@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"xarb/internal/application/usecase/monitor"
 	"xarb/internal/infrastructure/config"
 	"xarb/internal/infrastructure/logger"
 	"xarb/internal/infrastructure/svc"
@@ -30,24 +29,25 @@ func main() {
 		return
 	}
 
-	serviceCtx, err := svc.New(ctx, cfg)
+	serviceCtx, err := svc.New(cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("service context initialization failed")
 		return
 	}
 	defer serviceCtx.Close()
+	// 运行所有服务
+	if err := serviceCtx.Run(ctx); err != nil {
+		log.Error().Err(err).Msg("service exited with error")
+		return
+	}
+
 	log.Info().
 		Str("config", *configPath).
-		Int("symbols", len(cfg.Symbols.List)).
+		Int("coins", len(cfg.Symbols.Coins)).
+		Str("quote", cfg.Symbols.Quote).
 		Int("print_every_min", cfg.App.PrintEveryMin).
 		Float64("delta_threshold", cfg.Arbitrage.DeltaThreshold).
 		Bool("sqlite_enabled", cfg.SQLite.Enabled).
 		Bool("redis_enabled", cfg.Redis.Enabled).
 		Msg("xarb started")
-
-	service := monitor.NewService(serviceCtx.BuildMonitorServiceDeps())
-	if err := service.Run(ctx); err != nil {
-		log.Error().Err(err).Msg("monitor service exited")
-	}
-
 }

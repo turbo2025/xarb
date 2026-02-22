@@ -32,22 +32,30 @@ type ServiceContext struct {
 	sqliteRepo    *sqliterepo.Repo
 	sqliteArbRepo *sqliterepo.ArbitrageRepo
 
-	// 输出端口
-	Sink port.Sink
-
 	// 应用业务组件（依赖基础设施）
+	Sink                  port.Sink
 	priceFeeds            []monitor.PriceFeed
 	arbitrageCalculator   *service.ArbitrageCalculator
 	arbitrageExecutor     *domainservice.ArbitrageExecutor
 	perpetualOrderManager *domainservice.OrderManager
+	monitorService        *monitor.Service
+
+	// 可运行的服务列表（便于扩展）
+	runnableServices []Runnable
 
 	// 资源管理
 	closerChain []func() error
 }
 
+// Runnable 定义可运行服务的接口
+type Runnable interface {
+	Run(ctx context.Context) error
+}
+
 // New 创建并初始化 ServiceContext
 // 这是应用启动的唯一入口点，所有依赖初始化都在这里完成
-func New(ctx context.Context, cfg *config.Config) (*ServiceContext, error) {
+// 注意：不接收 context，初始化是同步的；Run 方法会接收 context 用于 graceful shutdown
+func New(cfg *config.Config) (*ServiceContext, error) {
 	// Initialize exchange clients & registry once (shared across services)
 	apiClients, err := factory.NewAPIClients(cfg)
 	if err != nil {
@@ -63,12 +71,13 @@ func New(ctx context.Context, cfg *config.Config) (*ServiceContext, error) {
 	}
 
 	sc := &ServiceContext{
-		Ctx:         ctx,
-		Config:      cfg,
-		apiClients:  apiClients,
-		wsManager:   wsManager,
-		Sink:        console.NewSink(),
-		closerChain: make([]func() error, 0),
+		Ctx:              context.Background(),
+		Config:           cfg,
+		apiClients:       apiClients,
+		wsManager:        wsManager,
+		Sink:             console.NewSink(),
+		closerChain:      make([]func() error, 0),
+		runnableServices: make([]Runnable, 0),
 	}
 
 	// 初始化所有组件，按依赖顺序
@@ -96,8 +105,16 @@ func (sc *ServiceContext) initializeComponents() error {
 		return ErrNoFeedsEnabled
 	}
 	sc.priceFeeds = feeds
+
+	// 创建 Monitor Service（监控价格和检测套利信号）
+	sc.monitorService = monitor.NewService(sc.BuildMonitorServiceDeps())
+
+	// 注册可运行的服务
+	sc.runnableServices = append(sc.runnableServices, sc.monitorService)
+
 	log.Info().
 		Int("feeds", len(feeds)).
+		Int("services", len(sc.runnableServices)).
 		Msg("✓ All components initialized")
 
 	return nil
@@ -238,6 +255,50 @@ func (sc *ServiceContext) GetWebSocketManager() *websocket.WebSocketManager {
 // GetArbitrageCalculator 获取套利计算器
 func (sc *ServiceContext) GetArbitrageCalculator() *service.ArbitrageCalculator {
 	return sc.arbitrageCalculator
+}
+
+// GetMonitorService 获取监控服务
+func (sc *ServiceContext) GetMonitorService() *monitor.Service {
+	return sc.monitorService
+}
+
+// RegisterService 注册一个可运行的服务
+// 用于扩展新的服务而无需修改 Run 方法
+func (sc *ServiceContext) RegisterService(service Runnable) {
+	sc.runnableServices = append(sc.runnableServices, service)
+}
+
+// Run 运行所有已注册的服务
+// 各服务并发运行，任意服务出错都会返回错误
+func (sc *ServiceContext) Run(ctx context.Context) error {
+	if len(sc.runnableServices) == 0 {
+		return fmt.Errorf("no runnable services registered")
+	}
+
+	// 如果只有一个服务，直接运行
+	if len(sc.runnableServices) == 1 {
+		log.Info().Str("service", "1/1").Msg("starting service")
+		return sc.runnableServices[0].Run(ctx)
+	}
+
+	// 多个服务：并发运行，任意错误都会返回
+	errCh := make(chan error, len(sc.runnableServices))
+	for i, svc := range sc.runnableServices {
+		go func(index int, service Runnable) {
+			log.Info().Int("service", index+1).Int("total", len(sc.runnableServices)).Msg("starting service")
+			if err := service.Run(ctx); err != nil {
+				errCh <- err
+			}
+		}(i, svc)
+	}
+
+	// 等待第一个错误或所有服务完成
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // Close 关闭 ServiceContext 中的所有资源

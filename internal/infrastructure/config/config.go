@@ -29,7 +29,6 @@ type Config struct {
 	Symbols struct {
 		Coins []string `toml:"coins"` // 币种列表 (e.g., ["BTC", "ETH", "SOL"])
 		Quote string   `toml:"quote"` // 计价货币 (e.g., "USDT")
-		List  []string // 内部计算字段：合并后的符号列表 (e.g., ["BTCUSDT", "ETHUSDT", "SOLUSDT"])
 	} `toml:"symbols"`
 
 	Arbitrage struct {
@@ -107,15 +106,6 @@ func validate(cfg *Config) error {
 	if strings.TrimSpace(cfg.Symbols.Quote) == "" {
 		return errors.New("symbols.quote is empty")
 	}
-
-	// 将 coins 和 quote 合并为标准格式
-	quote := strings.ToUpper(strings.TrimSpace(cfg.Symbols.Quote))
-	mergedList := make([]string, len(cfg.Symbols.Coins))
-	for i, coin := range cfg.Symbols.Coins {
-		mergedList[i] = strings.ToUpper(strings.TrimSpace(coin)) + quote
-	}
-	cfg.Symbols.List = normalizeSymbols(mergedList)
-
 	// 验证所有启用的交易所都有必要的配置
 	for exchangeName, exchCfg := range cfg.Exchanges {
 		if !exchCfg.Enabled {
@@ -142,23 +132,6 @@ func validate(cfg *Config) error {
 		}
 	}
 	return nil
-}
-
-func normalizeSymbols(in []string) []string {
-	out := make([]string, 0, len(in))
-	seen := map[string]struct{}{}
-	for _, s := range in {
-		u := strings.ToUpper(strings.TrimSpace(s))
-		if u == "" {
-			continue
-		}
-		if _, ok := seen[u]; ok {
-			continue
-		}
-		seen[u] = struct{}{}
-		out = append(out, u)
-	}
-	return out
 }
 
 // Exported types for programmatic configuration
