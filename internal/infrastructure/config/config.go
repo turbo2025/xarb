@@ -61,6 +61,16 @@ type Config struct {
 		Enabled bool   `toml:"enabled"`
 		DSN     string `toml:"dsn"`
 	} `toml:"postgres"`
+
+	Message struct {
+		Feishu []FeishuConfig `toml:"feishu"`
+	} `toml:"message"`
+}
+
+type FeishuConfig struct {
+	Channel string `toml:"channel"` // signal, order, pnl, market 等
+	Webhook string `toml:"webhook"` // 飞书机器人 webhook 地址
+	Secret  string `toml:"secret"`  // 飞书签名密钥
 }
 
 func Load(path string) (*Config, error) {

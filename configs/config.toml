@@ -1,8 +1,25 @@
 [app]
 print_every_min = 5
 
+[message]
+[[message.feishu]]
+channel = "signal"
+webhook = "https://open.feishu.cn/open-apis/bot/v2/hook/17914dc0-0523-4ed1-a62e-4d5c6e3b8654"
+secret = "33659DAUg2Q3Ac6BjnSOOc"
+[[message.feishu]]
+channel = "order"
+webhook = "https://open.feishu.cn/open-apis/bot/v2/hook/cd1d71df-0e0d-41d2-8051-e42acd078bc6"
+secret = "3OdMwaB0CNMmiuW9UY4qWb"
+[[message.feishu]]
+channel = "pnl"
+webhook = "https://open.feishu.cn/open-apis/bot/v2/hook/0ef4258e-e6bb-4772-9fce-190e15aba3b1"
+secret = "V6B6RfaYBbxS4SopH92Xlb"
+[[message.feishu]]
+channel = "market"
+webhook = "https://open.feishu.cn/open-apis/bot/v2/hook/5e3917f8-14de-4855-a9bb-ba197ac9dcb5"
+secret = "PjeS66quKWulErS9l4XCde"
+
 [symbols]
-# 新格式：使用 coins + quote (推荐)
 coins = ["BTC", "ETH", "SOL"]
 quote = "USDT"
 

@@ -7,16 +7,19 @@ Real-time arbitrage opportunity detector for cryptocurrency trading across multi
 All documentation lives under the [`docs/`](docs) directory. Start here:
 
 - **[Architecture Deep Dive](ARCHITECTURE.md)** - System design and DDD layers
-- **[Arbitrage System Guide](ARBITRAGE.md)** - Trading strategies and mechanisms
+- **[Arbitrage System Guide](ARBITRAGE.md)** - Trading strategies and mechanisms  
+- **[WebSocket Architecture](WEBSOCKET_ARCHITECTURE.md)** - Real-time data streaming design
 
 ## Features
 
-- 🔄 **Multi-Exchange Support**: Binance, Bybit, and extensible to more
+- 🔄 **Multi-Exchange Support**: Binance, Bybit, OKX, Bitget with unified API
 - 📊 **Real-time Price Monitoring**: WebSocket connections for instant price updates
-- 💡 **Spread Detection**: Identifies profitable arbitrage opportunities
+- 💡 **Spread Detection**: Automatic arbitrage opportunity identification
+- 🚀 **Smart Order Execution**: Multi-exchange order execution with deduplication
+- 💰 **Feishu Notifications**: Real-time signal alerts via Feishu bot
 - 💾 **Flexible Storage**: Redis, SQLite, PostgreSQL support
 - 📈 **Data Persistence**: Store and analyze historical opportunities
-- 🔧 **Configurable**: TOML-based configuration
+- 🔧 **Configurable**: TOML-based configuration with coins + quote format
 
 ## Architecture
 
@@ -36,64 +39,166 @@ All documentation lives under the [`docs/`](docs) directory. Start here:
 └─────────────────────────────────────┘
 ```
 
-See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture.
+
+## Key Components
+
+### Configuration
+
+XARB uses a flexible TOML-based configuration with symbol management:
+
+```toml
+[symbols]
+coins = ["BTC", "ETH", "SOL"]
+quote = "USDT"
+
+[arbitrage]
+delta_threshold = 5.0  # 5% spread threshold
+
+[monitor]
+exchanges = ["binance", "bybit", "okx"]  # Cross-exchange pairs
+
+[message.feishu]
+[[message.feishu]]
+channel = "signal"
+webhook = "https://open.feishu.cn/..."
+secret = "xxx"
+```
+
+### Service Architecture
+
+```
+ServiceContext (Central Hub)
+├── Exchanges (HTTP API Clients)
+│   ├── Binance (Spot + Perpetual)
+│   ├── Bybit (Spot + Perpetual)
+│   ├── OKX (Spot + Perpetual)
+│   └── Bitget (Spot + Perpetual)
+├── WebSocket Manager
+│   └── Real-time Price Feeds (all exchanges)
+├── Monitor Service
+│   ├── Price State Management
+│   ├── Spread Calculation
+│   └── Feishu Notifications
+└── Storage Layer
+    ├── SQLite (default)
+    ├── Redis (optional)
+    └── PostgreSQL (optional)
+```
 
 ## Quick Start
 
 ### Prerequisites
 
 - Go 1.21+
-- Redis (optional, for real-time signals)
+- Redis (optional, for signal streaming)
 - SQLite (included)
 
 ### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/xarb
+# Clone repository
+git clone https://github.com/yourusername/xarb.git
 cd xarb
 
 # Build
-make build
+go build ./cmd/xarb
 
 # Run
-./xarb -config configs/config.toml
+./xarb
 ```
 
 ### Configuration
 
-Edit `configs/config.toml`:
+1. Edit `configs/config.toml`:
 
 ```toml
 [app]
 print_every_min = 5
 
 [symbols]
-list = ["BTCUSDT", "ETHUSDT"]
+coins = ["BTC", "ETH", "SOL"]
+quote = "USDT"
 
-[exchange.binance]
+[arbitrage]
+delta_threshold = 5.0
+
+[exchanges.binance]
 enabled = true
-ws_url = "wss://fstream.binance.com"
+perpetual_ws_url = "wss://fstream.binance.com/ws"
+api_key = "your_api_key"
+secret_key = "your_secret_key"
 
-[storage.redis]
+[exchanges.bybit]
 enabled = true
-addr = "127.0.0.1:6379"
+perpetual_ws_url = "wss://stream.bybit.com/v5/public/linear"
+api_key = "your_api_key"
+secret_key = "your_secret_key"
 
-[storage.sqlite]
+[exchanges.okx]
+enabled = true
+perpetual_ws_url = "wss://ws.okx.com:8443/ws/v5/public"
+api_key = "your_api_key"
+secret_key = "your_secret_key"
+passphrase = "your_passphrase"
+
+[sqlite]
 enabled = true
 path = "./data/xarb.db"
+
+# Optional: Feishu notifications
+[message.feishu]
+[[message.feishu]]
+channel = "signal"
+webhook = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+secret = "your_secret_key"
+```
+
+2. Run:
+
+```bash
+./xarb
+```
+
+### Running Tests
+
+```bash
+go test ./...
+```
+
+## Core Concepts
+
+### Symbol Management
+
+XARB uses a unified symbol format across all exchanges:
+- **Config**: Raw coins list (`["BTC", "ETH", "SOL"]`) + quote currency (`"USDT"`)
+- **Conversion**: Each exchange has a `SymbolConverter` that handles format mapping
+  - Binance/Bybit/Bitget: `BTC` → `BTCUSDT`
+  - OKX: `BTC` → `BTC-USDT-SWAP`
+
+### Arbitrage Detection Flow
+
+```
+WebSocket Tick (exchange format)
+  ↓
+Symbol2Coin() conversion
+  ↓
+State.Apply() - price updates
+  ↓
+DeltaBand calculation - spread detection
+  ↓
+Band threshold crossing
+  ↓
+Signal generation → Feishu notification + Order execution
 ```
 
 ## Development
 
-### Building & Running
+### Building
 
 ```bash
-# Build the project
-make build
-
-# Run the application
-make run
+# Build
+go build ./cmd/xarb
 
 # Run tests
 make test
@@ -241,32 +346,68 @@ See [BOT_CONVENTIONS.md](.github/skills/BOT_CONVENTIONS.md#监控告警) for det
 
 ## Roadmap
 
-- [ ] Prometheus metrics integration
-- [ ] Multiple trading strategy support
+**Current (v0.1)**:
+- ✅ Multi-exchange WebSocket price monitoring
+- ✅ Real-time spread detection
+- ✅ Feishu notifications
+- ✅ SQLite/Redis/PostgreSQL support
+- ✅ Symbol format conversion
+
+**Planned (v0.2)**:
+- [ ] Order execution with risk management
+- [ ] Funding rate arbitrage strategy
 - [ ] Advanced spread analysis
-- [ ] WebSocket connection pooling optimization
-- [ ] Distributed execution support
-- [ ] REST API for signal queries
+- [ ] REST API for queries
 - [ ] Web dashboard
+- [ ] Distributed deployment support
 
-## License
+## Status
 
-MIT License - see LICENSE file for details
+**Development Status**: 🚀 Active Development  
+**Current Version**: 0.1.0-beta  
+**Last Updated**: February 23, 2026
 
-## Support
+### Working Features
+- ✅ Real-time price monitoring from 4 exchanges
+- ✅ Automatic spread detection
+- ✅ Feishu bot notifications
+- ✅ Configurable monitoring parameters
+- ✅ Multiple storage backends
 
-- 📖 [Architecture Guide](docs/ARCHITECTURE.md)
-- 💰 [Arbitrage Guide](docs/ARBITRAGE.md)
-- 📋 [Project Readme](readme.md)
-- 💬 [Issues](https://github.com/yourusername/xarb/issues)
+### Known Limitations
+- Order execution framework in progress
+- Risk management system under development
+- Funding rate arbitrage not yet implemented
+
+## Support & Documentation
+
+- 📖 [Architecture Guide](ARCHITECTURE.md) - Complete system design
+- 💰 [Arbitrage Guide](ARBITRAGE.md) - Trading strategies
+- 🔌 [WebSocket Architecture](WEBSOCKET_ARCHITECTURE.md) - Real-time data design
+- 💬 [Issues](https://github.com/yourusername/xarb/issues) - Report bugs
+
+## Contributing
+
+Contributions welcome! Areas needing help:
+- Order execution implementation
+- Risk management logic
+- New exchange integrations
+- Documentation improvements
+- Test coverage
 
 ## Acknowledgments
 
-- Built with Go, Redis, SQLite
-- Trading data from Binance, Bybit APIs
-- Clean Architecture principles from Domain-Driven Design
+- Built with [Go](https://golang.org/) 1.21+
+- Storage: [SQLite](https://www.sqlite.org/), [Redis](https://redis.io/), [PostgreSQL](https://www.postgresql.org/)
+- Exchanges: [Binance](https://www.binance.com/), [Bybit](https://www.bybit.com/), [OKX](https://www.okx.com/), [Bitget](https://www.bitget.com/)
+- Architecture: [Domain-Driven Design](https://en.wikipedia.org/wiki/Domain-driven_design)
+- Notifications: [Feishu Bot API](https://open.feishu.cn/)
+
+## License
+
+MIT License
 
 ---
 
-**Status**: Active Development  
-**Last Updated**: February 18, 2026
+**Start here**: [Architecture Deep Dive](ARCHITECTURE.md) | [Quick Start](#quick-start)
+

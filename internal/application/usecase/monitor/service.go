@@ -190,7 +190,6 @@ func (s *Service) Run(ctx context.Context) error {
 			// 穿越阈值：band 变化且新 band != 0 才发信号
 			if band != prevBand && band != 0 {
 				payload := s.fmt.Render(s.st, RenderSnapshot) // 用快照格式（无 \r / 清行）
-				// _ = s.deps.Repo.InsertSignal(ctx, time.Now().UnixMilli(), t.Symbol, delta, payload)
 				// ⚠️ 信号直接打到 console（一次）
 				s.deps.Sink.NewLine()
 				log.Warn().
@@ -198,7 +197,10 @@ func (s *Service) Run(ctx context.Context) error {
 					Float64("delta", delta).
 					Int("band", band).
 					Float64("threshold", s.deps.DeltaThreshold).
-					Msg(payload)
+					Msg("arbitrage signal detected")
+
+				// 发送飞书通知（如果配置了飞书）
+				s.sendFeishuSignal(t.Symbol, delta, payload)
 
 				// ✅ 新增：检测到套利机会，执行订单！
 				if s.deps.OrderManager != nil && s.deps.Executor != nil {
@@ -380,4 +382,22 @@ func calculateRealizedProfit(buyStatus, sellStatus *domainservice.OrderStatus) f
 	}
 	// 简化版本：卖出收入 - 买入成本
 	return (sellStatus.AvgExecutedPrice - buyStatus.AvgExecutedPrice) * buyStatus.ExecutedQuantity
+}
+
+// sendFeishuSignal 发送套利信号到飞书
+func (s *Service) sendFeishuSignal(symbol string, delta float64, payload string) {
+	// 使用类型断言检查是否是飞书 Sink
+	type FeishuSender interface {
+		SendSignal(symbol string, delta float64, payload string) error
+	}
+
+	if feishuSink, ok := s.deps.Sink.(FeishuSender); ok {
+		if err := feishuSink.SendSignal(symbol, delta, payload); err != nil {
+			log.Error().
+				Err(err).
+				Str("symbol", symbol).
+				Float64("delta", delta).
+				Msg("failed to send feishu signal")
+		}
+	}
 }

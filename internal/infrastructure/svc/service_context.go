@@ -18,6 +18,7 @@ import (
 	sqliterepo "xarb/internal/infrastructure/storage/sqlite"
 	"xarb/internal/infrastructure/websocket"
 	"xarb/internal/interfaces/console"
+	"xarb/internal/interfaces/notification"
 )
 
 type ServiceContext struct {
@@ -75,7 +76,7 @@ func New(cfg *config.Config) (*ServiceContext, error) {
 		Config:           cfg,
 		apiClients:       apiClients,
 		wsManager:        wsManager,
-		Sink:             console.NewSink(),
+		Sink:             initializeSink(cfg),
 		closerChain:      make([]func() error, 0),
 		runnableServices: make([]Runnable, 0),
 	}
@@ -418,3 +419,17 @@ func extractPriceFeedsFromWSManager(enabledExchanges []string, wsm *websocket.We
 // 	// 如果有多于两个交易所，使用新的构造函数支持所有交易所
 // 	return domainservice.NewOrderManagerWithClients(clients), nil
 // }
+
+// initializeSink 初始化 Sink，支持 console 和飞书输出
+func initializeSink(cfg *config.Config) port.Sink {
+	consoleSink := console.NewSink()
+
+	// 如果配置了飞书，创建飞书 Sink（包含 consoleSink）
+	if len(cfg.Message.Feishu) > 0 {
+		notificationSink := notification.NewSink(consoleSink, cfg.Message.Feishu)
+		log.Info().Int("channels", len(cfg.Message.Feishu)).Msg("✓ Feishu sink initialized")
+		return notificationSink
+	}
+
+	return consoleSink
+}

@@ -51,37 +51,31 @@ Business processes and use case implementations that orchestrate domain services
 
 **Key Components:**
 
-- **Ports** (`application/port/`)
-  - Interface definitions for dependency injection
-  - `ArbitrageRepository` - Data persistence interface
-  - `PriceFeed` - Price update interface
-  - `EventBus` - Event distribution
+- **Ports** (`application/port/`) - Interface contracts
+  - `PriceFeed` - Standard price feed interface with bidirectional symbol conversion
+    - `Subscribe(ctx, coins)` - Subscribe to price updates
+    - `Symbol2Coin(symbol)` - Convert exchange format to coin
+    - `Coin2Symbol(coin)` - Convert coin to exchange format
+  - `Repository` - Data persistence interface
+  - `Sink` - Output abstraction (console, Feishu, etc.)
 
 - **Services** (`application/service/`)
-  - `ArbitrageService` - Opportunity scanning
+  - `ArbitrageCalculator` - Spread opportunity detection
   - `PriceService` - Price data management
   - `PositionService` - Position tracking
-  - `FundingRateSyncer` - Funding rate updates
-  - `SnapshotService` - Data snapshots
-  - `SignalService` - Signal generation
-  - `ArbitrageCalculator` - Calculation utilities
+  - `SignalService` - Signal generation and filtering
 
-- **Use Cases** (`application/usecase/`)
-  - `monitor/` - Main monitoring service
-    - `service.go` - Core monitoring logic
-    - `formatter.go` - Output formatting
-    - `state.go` - State management
-    - `types.go` - Type definitions
-
-- **Container** (`application/container/`)
-  - `container.go` - Dependency injection container
-  - Centralizes service instantiation and wiring
+- **Use Cases** (`application/usecase/monitor/`)
+  - `service.go` - Main monitoring logic with Feishu integration
+  - `state.go` - Price state machine and delta calculation
+  - `formatter.go` - Display formatting with exchange filtering
+  - `types.go` - Shared type definitions
 
 **Characteristics:**
 - Depends on `port` interfaces (dependency inversion)
 - Relatively thin layer, mostly coordinating domain and infrastructure
 - No business rules here, only process flow
-- Easy to extend with new use cases
+- Easy to extend with new use cases (via Runnable interface)
 
 ### 3. Infrastructure Layer (`internal/infrastructure/`)
 
@@ -89,89 +83,137 @@ Technical implementations and external dependencies.
 
 **Key Components:**
 
-- **Exchange Adapters** (`infrastructure/exchange/`)
-  - `binance/` - Binance REST & WebSocket clients
-    - `futures_account_client.go` - Account info
-    - `futures_order_client.go` - Order management
-    - `futures_position_client.go` - Position queries
-    - `ws_client.go` - WebSocket connections
-  - `bybit/` - Bybit REST & WebSocket clients
-    - `linear_account_client.go` - Account info
-    - `linear_order_client.go` - Order management
-    - `linear_position_client.go` - Position queries
-    - `ws_client.go` - WebSocket connections
-  - Similar adapters for OKX, Bitget, etc.
+- **ServiceContext** (`svc/service_context.go`)
+  - Central hub for all services and dependencies
+  - Unified lifecycle management via `Runnable` interface
+  - Single entry point for initialization and configuration
+  - Handles graceful shutdown with `closerChain`
+  - Concurrent service execution support
 
-- **Storage Layer** (`infrastructure/storage/`)
-  - `sqlite/` - SQLite implementation
-  - `postgres/` - PostgreSQL implementation
-  - `redis/` - Redis implementation
-  - Common interface: `Repository`
+- **Exchange Integration** (`exchange/` & `factory/`)
+  - Multiple exchange support: Binance, Bybit, OKX, Bitget
+  - Unified symbol conversion via `SymbolConverter` interface
+  - Spot and Perpetual market support
+  - REST API clients for account, orders, positions
+  - WebSocket clients for real-time price data
 
-- **Configuration** (`infrastructure/config/`)
-  - TOML configuration loading
-  - Environment variable overrides
-  - Validation
+- **WebSocket Management** (`websocket/`)
+  - Centralized connection management
+  - Auto-reconnection with exponential backoff
+  - Support for Spot and Perpetual WebSocket streams
+  - Factory pattern for exchange-specific initializers
 
-- **Logger** (`infrastructure/logger/`)
+- **Storage Layer** (`storage/`)
+  - SQLite - Default, embedded storage
+  - Redis - Optional, for streaming and caching
+  - PostgreSQL - Optional, for production deployments
+  - Common interface: `Repository` and `ArbitrageRepository`
+
+- **Configuration** (`config/`)
+  - TOML-based configuration system
+  - Coins + quote format for symbol management
+  - Multi-storage backend support
+  - Feishu notification configuration
+  - Validation and default values
+
+- **Logger** (`logger/`)
   - Structured logging with zerolog
   - Decoupled from business logic
 
 ### 4. Interfaces Layer (`internal/interfaces/`)
 
-External-facing interfaces and adapters.
+External-facing adapters and notification systems.
 
 **Components:**
 
-- **Console** (`interfaces/console/`)
-  - CLI output formatting
-  - Terminal rendering
+- **Console** (`console/`)
+  - Real-time terminal output with ANSI colors
+  - Live price updates with cursor control
+  - Signal display with delta calculations
 
-- **HTTP** (`interfaces/http/`)
-  - REST API endpoints (optional)
-  - Health checks and metrics
+- **Feishu** (`feishu/`)
+  - HTTP client for Feishu bot API
+  - HMAC-SHA256 signature generation
+  - Composite Sink combining console + Feishu output
+  - Message formatting and ANSI stripping
+  - Multi-channel support (signal, order, pnl, market)
 
 ## Data Flow
+
+### Initialization Flow
+```
+main.go
+    ↓
+svc.New(cfg) → ServiceContext
+    ↓
+├── Load configuration (TOML)
+├── Initialize exchange API clients
+├── Set up WebSocket manager
+│   └── Register price feeds from all exchanges
+├── Initialize storage (SQLite/Redis/PostgreSQL)
+├── Create Sink (Console or Feishu)
+└── Instantiate Monitor Service
+    ↓
+RegisterService(monitorService) → runnableServices
+    ↓
+svc.Run(ctx) → Execute all services concurrently
+```
 
 ### Price Update Flow
 ```
 Exchange WebSocket
     ↓
-infrastructure/exchange/{exchange}/ws_client.go
+ws_client.go (each exchange)
     ↓
-application/port/pricefeed.go (interface)
+Symbol2Coin() conversion (e.g., "BTCUSDT" → "BTC")
     ↓
-application/service/price_service.go
+Monitor Service goroutine
     ↓
-application/usecase/monitor/service.go
+State.Apply() - Update price state
+    ↓
+Formatter.Render() - Format display
+    ↓
+Sink.WriteLive() - Console or Feishu output
 ```
 
-### Arbitrage Detection Flow
+### Arbitrage Signal Flow
 ```
-Price Update
+Price Update Event
     ↓
-application/usecase/monitor/service.go
+State.DeltaBand() - Calculate spread
     ↓
-application/service/arbitrage_service.go
+Band Threshold Crossing Detection
     ↓
-domain/service/arbitrage_executor.go (business logic)
+Monitor Service: handleArbitrageSignal()
     ↓
-application/port/arbitrage.go (interface)
+├── Feishu Notification via Sink.SendSignal()
+└── OrderManager.ExecuteArbitrage()
     ↓
-infrastructure/storage/{backend}/ (persist)
+Exchange API - Place orders
+    ↓
+verifyOrderExecution() - Confirm execution
 ```
 
-### Order Execution Flow
+### Symbol Conversion System
 ```
-Arbitrage Signal
+Configuration:
+  coins = ["BTC", "ETH", "SOL"]
+  quote = "USDT"
     ↓
-domain/service/risk_manager.go (validate)
+Each Exchange Package:
+  okx/ws_client.go
+  bybit/ws_client.go
+  binance/ws_client.go
+  bitget/ws_client.go
     ↓
-domain/service/order_manager.go (execute)
+SymbolConverter Interface:
+  Symbol2Coin(symbol string) string
+  Coin2Symbol(coin string) string
     ↓
-infrastructure/exchange/{exchange}/futures_order_client.go
+Package-level Singleton:
+  symbolConverter SymbolConverter
     ↓
-Exchange REST API
+InitializeConverter(quote string) called once
 ```
 
 ## Key Design Patterns
@@ -188,18 +230,39 @@ Exchange REST API
 - Supports SQLite, PostgreSQL, Redis seamlessly
 
 ### 3. Adapter Pattern
-- Each exchange is an adapter
-- Uniform interface (`OrderClient`, `AccountClient`, etc.)
+- Symbol conversion adapters for each exchange
+- Uniform interface (`PriceFeed`, `OrderClient`, etc.)
 - Easy to add new exchanges without changing business logic
 
-### 4. Service Locator / Dependency Container
-- `application/container/container.go`
-- Centralizes service creation
-- Makes testing easier with mock containers
+### 4. Factory Pattern
+- Service context as central factory
+- Exchange registry for dynamic initialization
+- Runnable interface for pluggable services
 
 ### 5. Strategy Pattern
-- Different trading strategies (spread, funding, etc.)
-- Easy to add new strategies without changing core logic
+- Different trading strategies as implementations
+- Signal detection via threshold crossing
+- Easy to add new strategies
+
+## Key Architecture Improvements
+
+### Symbol Conversion System
+- **Centralized**: Single `SymbolConverter` interface
+- **Reusable**: Package-level singletons per exchange
+- **Bidirectional**: `Symbol2Coin()` and `Coin2Symbol()` methods
+- **Extensible**: Easy to support new symbol formats
+
+### ServiceContext Pattern
+- **Single Initialization Point**: Unified setup in `svc.New(cfg)`
+- **Service Registry**: Support for multiple concurrent services via `Runnable` interface
+- **Graceful Shutdown**: Automatic resource cleanup with `closerChain`
+- **Dependency Management**: All services created and managed in one place
+
+### Output Abstraction
+- **Sink Interface**: Decouples business logic from output
+- **Console Sink**: Real-time terminal output
+- **Feishu Sink**: Composite sink supporting both console + Feishu notifications
+- **ANSI Stripping**: Automatic cleanup of color codes for Feishu
 
 ## Project Structure
 
@@ -207,35 +270,55 @@ Exchange REST API
 xarb/
 ├── cmd/
 │   └── xarb/
-│       └── main.go                 # Entry point
+│       └── main.go                 # Entry point, calls svc.New() and svc.Run()
 ├── configs/
-│   └── config.toml                 # Configuration
+│   └── config.toml                 # TOML configuration with coins + quote format
 ├── data/                           # Database files
 ├── docs/                           # Documentation
 ├── internal/
 │   ├── application/
-│   │   ├── container/              # DI container
-│   │   ├── port/                   # Interface definitions
-│   │   ├── service/                # Business logic coordination
+│   │   ├── port/                   # Interface contracts
+│   │   │   ├── pricefeed.go        # Symbol2Coin/Coin2Symbol
+│   │   │   ├── repository.go
+│   │   │   └── sink.go             # Console/Feishu output
+│   │   ├── service/                # Business orchestration
+│   │   │   ├── arbitrage_calculator.go
+│   │   │   ├── price_service.go
+│   │   │   └── signal_service.go
 │   │   └── usecase/                # Use case implementations
-│   │       └── monitor/            # Monitoring use case
+│   │       └── monitor/            # Price monitoring
+│   │           ├── service.go      # Main logic with Feishu integration
+│   │           ├── state.go        # Price state and delta calculation
+│   │           └── formatter.go    # Display with ANSI formatting
 │   ├── domain/
 │   │   ├── model/                  # Domain models
+│   │   │   ├── arbitrage.go
+│   │   │   └── symbol.go
 │   │   └── service/                # Core business logic
+│   │       ├── arbitrage_executor.go
+│   │       ├── order_manager.go
+│   │       └── risk_manager.go
 │   ├── infrastructure/
-│   │   ├── config/                 # Configuration loading
-│   │   ├── container/              # Container implementation
+│   │   ├── config/                 # Configuration management
 │   │   ├── exchange/               # Exchange adapters
-│   │   ├── factory/                # Factory helpers
-│   │   ├── logger/                 # Logging
+│   │   │   ├── okx/
+│   │   │   ├── bybit/
+│   │   │   ├── binance/
+│   │   │   ├── bitget/
+│   │   │   └── symbol.go           # SymbolConverter implementations
+│   │   ├── factory/                # API client factory
+│   │   ├── svc/                    # ServiceContext and initialization
 │   │   ├── storage/                # Data persistence
-│   │   └── svc/                    # Service utilities
+│   │   ├── websocket/              # WebSocket management
+│   │   └── logger/                 # Structured logging
 │   └── interfaces/
-│       ├── console/                # CLI output
-│       └── http/                   # REST API
-├── go.mod                          # Go modules
-├── go.sum                          # Dependencies
-└── Makefile                        # Build script
+│       ├── console/                # Terminal output
+│       └── feishu/                 # Feishu notifications
+│           ├── client.go           # Feishu HTTP client
+│           └── sink.go             # Composite Sink implementation
+├── go.mod
+├── go.sum
+└── Makefile
 ```
 
 ## Extension Points
@@ -243,33 +326,35 @@ xarb/
 ### Adding a New Exchange
 
 1. Create new adapter in `infrastructure/exchange/{exchange}/`
-2. Implement required client interfaces:
-   - `AccountClient` - Account information
-   - `OrderClient` - Order management
-   - `PositionClient` - Position queries
-3. Update factory in `infrastructure/factory/`
-4. Add configuration to `config.toml`
+2. Implement required interfaces:
+   - `PriceFeed` - Real-time price streaming with `Symbol2Coin()` and `Coin2Symbol()`
+   - `OrderClient` - Order placement and cancellation
+   - `AccountClient` - Account information queries
+3. Create `register.go` with `pricefeed.Register()` in `init()`
+4. Implement `SymbolConverter` for exchange-specific format
+5. Add configuration section in `config.toml`
 
 ### Adding New Storage Backend
 
 1. Implement `repository.Repository` interface
 2. Create in `infrastructure/storage/{backend}/`
-3. Update container in `application/container/`
+3. Register in `ServiceContext.initializeStorage()`
 4. Add configuration option in `config.toml`
 
-### Adding New Use Case
+### Adding New Service/Use Case
 
-1. Create service in `application/service/`
-2. Implement in `application/usecase/`
-3. Wire into container via `application/container/`
-4. Expose via `interfaces/` layer if needed
+1. Create service implementing `Runnable` interface
+2. Initialize in `ServiceContext`
+3. Register via `RegisterService(service)`
+4. Runs concurrently with other services
 
 ## Testing Strategy
 
-- **Domain Services**: Pure unit tests, no mocks needed
-- **Application Services**: Mock infrastructure via ports interface
+- **Domain Services**: Pure unit tests, no framework dependencies
+- **Application Services**: Mock infrastructure via `port` interfaces
 - **Infrastructure**: Integration tests with test databases
 - **Use Cases**: End-to-end tests with mock services
+- **Monitor Service**: Test with mock price feeds and sinks
 
 ## Configuration
 
@@ -277,40 +362,101 @@ Edit `configs/config.toml`:
 
 ```toml
 [app]
-print_every_min = 1
+print_every_min = 5
 
 [symbols]
-list = ["BTCUSDT", "ETHUSDT"]
+coins = ["BTC", "ETH", "SOL"]
+quote = "USDT"
 
-[exchange.binance]
+[arbitrage]
+delta_threshold = 5.0  # 5% spread threshold
+
+[monitor]
+exchanges = ["binance", "bybit", "okx"]  # Optional: specify exchanges to monitor
+
+[exchanges.binance]
 enabled = true
-ws_url = "wss://fstream.binance.com"
+api_key = "your_key"
+secret_key = "your_secret"
+perpetual_http_url = "https://fapi.binance.com"
+perpetual_ws_url = "wss://fstream.binance.com/ws"
 
-[exchange.bybit]
+[exchanges.bybit]
 enabled = true
-ws_url = "wss://stream.bybit.com/v5/public/linear"
+api_key = "your_key"
+secret_key = "your_secret"
+perpetual_http_url = "https://api.bybit.com"
+perpetual_ws_url = "wss://stream.bybit.com/v5/public/linear"
 
-[storage.sqlite]
+[exchanges.okx]
+enabled = true
+api_key = "your_key"
+secret_key = "your_secret"
+passphrase = "your_passphrase"
+perpetual_http_url = "https://www.okx.com"
+perpetual_ws_url = "wss://ws.okx.com:8443/ws/v5/public"
+
+[message.feishu]
+[[message.feishu]]
+channel = "signal"
+webhook = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+secret = "your_secret_key"
+
+[sqlite]
 enabled = true
 path = "data/xarb.db"
 
-[arbitrage]
-min_spread = 0.01  # Minimum 0.01% profit
+[redis]
+enabled = false
+addr = "127.0.0.1:6379"
+password = ""
+db = 0
 ```
 
-## Benefits of DDD Architecture
+## System Startup Sequence
 
-✅ **Clear Separation**: Each layer has a single responsibility  
+1. **main.go**
+   - Parse command-line flags
+   - Initialize logger
+   - Load configuration from `config.toml`
+
+2. **ServiceContext.New(cfg)**
+   - Initialize exchange API clients
+   - Create WebSocket manager
+   - Register price feeds from all enabled exchanges
+   - Initialize storage layer
+   - Create Sink (Console or Feishu)
+   - Instantiate Monitor Service
+   - Add services to `runnableServices`
+
+3. **ServiceContext.Run(ctx)**
+   - Execute all registered services concurrently
+   - Each service runs independently
+   - First service error returns immediately
+   - Remaining services cleaned up via `ctx.Done()`
+
+4. **Graceful Shutdown**
+   - SIGINT/SIGTERM handling in main
+   - Cancel context
+   - Close all running services
+   - Execute cleanup chain (`closerChain`)
+
+## Benefits of This Architecture
+
+✅ **Clear Separation**: Each layer has single responsibility  
 ✅ **Testability**: Business logic independent of frameworks  
-✅ **Extensibility**: Easy to add exchanges, storage, or strategies  
+✅ **Extensibility**: Easy to add exchanges, storage, or services  
 ✅ **Maintainability**: Logical organization, clear dependencies  
 ✅ **Scalability**: Ready for complex features and optimizations  
 ✅ **Flexibility**: Swap implementations without changing logic  
+✅ **Concurrency**: Multiple services running safely in parallel  
+✅ **Notifications**: Built-in Feishu integration for real-time alerts  
 
-## Key Files to Understand
+## Key Files to Start With
 
-1. **Entry Point**: `cmd/xarb/main.go`
-2. **Container**: `internal/application/container/container.go`
-3. **Monitor Use Case**: `internal/application/usecase/monitor/service.go`
-4. **Core Logic**: `internal/domain/service/arbitrage_executor.go`
-5. **Exchange Adapters**: `internal/infrastructure/exchange/{exchange}/`
+1. **Entry Point**: [cmd/xarb/main.go](../../cmd/xarb/main.go)
+2. **Service Hub**: [internal/infrastructure/svc/service_context.go](../../internal/infrastructure/svc/service_context.go)
+3. **Monitor Logic**: [internal/application/usecase/monitor/service.go](../../internal/application/usecase/monitor/service.go)
+4. **Core Business**: [internal/domain/service/arbitrage_executor.go](../../internal/domain/service/arbitrage_executor.go)
+5. **Exchange Adapters**: [internal/infrastructure/exchange/okx/ws_client.go](../../internal/infrastructure/exchange/okx/ws_client.go)
+```
