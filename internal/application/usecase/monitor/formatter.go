@@ -97,7 +97,7 @@ func (f *Formatter) Render(st *State, mode RenderMode) string {
 					col = ansiYellow
 				}
 			}
-			sb.WriteString(colorize(ex[:1]+":"+priceStr, col))
+			sb.WriteString(colorize(ex+":"+priceStr, col))
 		}
 
 		// 计算最大价差
@@ -131,11 +131,12 @@ func (f *Formatter) Render(st *State, mode RenderMode) string {
 // getExchangesToDisplay 获取要显示的交易所列表
 func (f *Formatter) getExchangesToDisplay(ss symState) []string {
 	if len(f.Exchanges) > 0 {
-		// 使用指定的交易所，但只显示存在的
+		// 使用指定的交易所，但只显示存在的（大小写不敏感）
 		var result []string
 		for _, ex := range f.Exchanges {
-			if _, ok := ss.exchanges[ex]; ok {
-				result = append(result, ex)
+			exUpper := strings.ToUpper(strings.TrimSpace(ex))
+			if _, ok := ss.exchanges[exUpper]; ok {
+				result = append(result, exUpper)
 			}
 		}
 		return result

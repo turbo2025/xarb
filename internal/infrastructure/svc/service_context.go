@@ -224,11 +224,8 @@ func (sc *ServiceContext) GetSQLiteRepo() *sqliterepo.Repo {
 // 这个方法由 Application 层 UseCase 调用
 // 返回一个完整的、经过验证的依赖集合
 func (sc *ServiceContext) BuildMonitorServiceDeps() monitor.ServiceDeps {
-	// 获取所有enabled的交易所列表（用于两两比较套利机会）
-	enabledExchanges := sc.Config.GetEnabledExchanges()
-
 	return monitor.ServiceDeps{
-		Exchanges:      enabledExchanges, // 使用从config中获取的enabled交易所列表
+		Exchanges:      sc.Config.GetEnabledExchanges(), // 使用从config中获取的enabled交易所列表
 		Feeds:          sc.priceFeeds,
 		Coins:          sc.Config.Symbols.Coins, // 原始币种列表，由feed转换为交易所特定格式
 		PrintEveryMin:  sc.Config.App.PrintEveryMin,
@@ -332,9 +329,9 @@ func extractPriceFeedsFromWSManager(enabledExchanges []string, wsm *websocket.We
 	var feeds []monitor.PriceFeed
 	for _, exchange := range enabledExchanges {
 		// 检查现货 WebSocket 连接
-		// if clients := wsm.GetSpotClient(exchange); clients != nil && clients.PriceFeed != nil {
-		// 	feeds = append(feeds, clients.PriceFeed)
-		// }
+		if clients := wsm.GetSpotClient(exchange); clients != nil && clients.PriceFeed != nil {
+			feeds = append(feeds, clients.PriceFeed)
+		}
 		// 检查合约 WebSocket 连接
 		if clients := wsm.GetPerpetualClient(exchange); clients != nil && clients.PriceFeed != nil {
 			feeds = append(feeds, clients.PriceFeed)

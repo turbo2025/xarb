@@ -24,7 +24,7 @@ func Register(exchangeName string, factory Factory) {
 		log.Warn().Str("exchange", exchangeName).Msg("price feed factory already registered, overwriting")
 	}
 	registry[exchangeName] = factory
-	log.Debug().Str("exchange", exchangeName).Msg("price feed factory registered")
+	// log.Debug().Str("exchange", exchangeName).Msg("price feed factory registered")
 }
 
 // Get 获取已注册的price feed factory for给定的exchange名称

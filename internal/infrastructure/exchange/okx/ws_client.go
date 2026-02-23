@@ -48,6 +48,14 @@ func (f *TickerFeed) Symbol2Coin(symbol string) string {
 	return symbolConverter.Symbol2Coin(symbol)
 }
 
+// Coin2Symbol 将币种转换为 OKX 格式的交易对
+func (f *TickerFeed) Coin2Symbol(coin string) string {
+	if symbolConverter == nil {
+		return ""
+	}
+	return symbolConverter.Coin2Symbol(coin)
+}
+
 type okxSubReq struct {
 	Op   string      `json:"op"`
 	Args []okxSubArg `json:"args"`

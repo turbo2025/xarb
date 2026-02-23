@@ -16,4 +16,7 @@ type PriceFeed interface {
 	// Symbol2Coin 将交易所特定格式的交易对转换为币种
 	// 例: BTC-USDT-SWAP -> BTC, BTCUSDT -> BTC
 	Symbol2Coin(symbol string) string
+	// Coin2Symbol 将币种转换为交易所特定格式的交易对
+	// 例: BTC -> BTC-USDT-SWAP (OKX), BTC -> BTCUSDT (Bybit)
+	Coin2Symbol(coin string) string
 }

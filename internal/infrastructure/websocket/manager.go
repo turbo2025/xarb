@@ -66,11 +66,8 @@ func (m *WebSocketManager) Initialize(cfg *config.Config) error {
 	enabledExchanges := cfg.GetEnabledExchanges()
 	var failedExchanges []string
 
-	// 获取配置的quote（计价货币）
-	quote := strings.TrimSpace(cfg.Symbols.Quote)
-
 	// 为各交易所初始化符号转换器（一次性初始化，避免重复）
-	initializeExchangeConverters(quote, enabledExchanges)
+	initializeExchangeConverters(strings.TrimSpace(cfg.Symbols.Quote), enabledExchanges)
 
 	// 定义要初始化的交易类型配置
 	type tradeTypeConfig struct {
@@ -82,7 +79,7 @@ func (m *WebSocketManager) Initialize(cfg *config.Config) error {
 	for _, exchangeName := range enabledExchanges {
 		exchCfg := cfg.Exchanges[exchangeName]
 
-		// 遍历所有交易类型（Spot 和 Perpetual），避免重复代码
+		// 遍历所有交易类型（Spot 和 Perpetual），暂时只有 Perpetual，Spot 可以后续添加
 		configs := []tradeTypeConfig{
 			// {name: application.TradeTypeSpot, wsURL: exchCfg.SpotWsURL, clients: m.spotClients},
 			{name: application.TradeTypePerpetual, wsURL: exchCfg.PerpetualWsURL, clients: m.perpetualClients},
@@ -92,7 +89,7 @@ func (m *WebSocketManager) Initialize(cfg *config.Config) error {
 			if tc.wsURL == "" {
 				continue
 			}
-			if err := m.registerWebSocketWithRetry(exchangeName, tc.wsURL, tc.name, tc.clients, quote); err != nil {
+			if err := m.registerWebSocketWithRetry(exchangeName, tc.wsURL, tc.name, tc.clients); err != nil {
 				log.Error().Err(err).
 					Str("exchange", exchangeName).
 					Str("type", tc.name).
@@ -119,7 +116,7 @@ func (m *WebSocketManager) Initialize(cfg *config.Config) error {
 }
 
 // registerWebSocketWithRetry 带重试的 WebSocket 连接注册
-func (m *WebSocketManager) registerWebSocketWithRetry(exchangeName, wsURL, tradeType string, clients map[string]*WebSocketClients, quote string) error {
+func (m *WebSocketManager) registerWebSocketWithRetry(exchangeName, wsURL, tradeType string, clients map[string]*WebSocketClients) error {
 	var lastErr error
 	delay := m.retryConfig.InitialDel
 
@@ -139,7 +136,7 @@ func (m *WebSocketManager) registerWebSocketWithRetry(exchangeName, wsURL, trade
 			}
 		}
 
-		if err := m.registerWebSocket(exchangeName, wsURL, tradeType, clients, quote); err != nil {
+		if err := m.registerWebSocket(exchangeName, wsURL, tradeType, clients); err != nil {
 			lastErr = err
 			continue
 		}
@@ -152,7 +149,7 @@ func (m *WebSocketManager) registerWebSocketWithRetry(exchangeName, wsURL, trade
 }
 
 // registerWebSocket 注册 WebSocket 连接的通用方法
-func (m *WebSocketManager) registerWebSocket(exchangeName string, wsURL string, tradeType string, clients map[string]*WebSocketClients, quote string) error {
+func (m *WebSocketManager) registerWebSocket(exchangeName string, wsURL string, tradeType string, clients map[string]*WebSocketClients) error {
 	factory, ok := pricefeed.Get(exchangeName)
 	if !ok {
 		return fmt.Errorf("price feed factory not registered for exchange: %s", exchangeName)
