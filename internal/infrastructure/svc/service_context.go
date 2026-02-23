@@ -34,12 +34,11 @@ type ServiceContext struct {
 	sqliteArbRepo *sqliterepo.ArbitrageRepo
 
 	// 应用业务组件（依赖基础设施）
-	Sink                  port.Sink
-	priceFeeds            []monitor.PriceFeed
-	arbitrageCalculator   *service.ArbitrageCalculator
-	arbitrageExecutor     *domainservice.ArbitrageExecutor
-	perpetualOrderManager *domainservice.OrderManager
-	monitorService        *monitor.Service
+	Sink                port.Sink
+	priceFeeds          []monitor.PriceFeed
+	arbitrageCalculator *service.ArbitrageCalculator
+	arbitrageExecutor   *domainservice.ArbitrageExecutor
+	monitorService      *monitor.Service
 
 	// 可运行的服务列表（便于扩展）
 	runnableServices []Runnable
@@ -98,7 +97,6 @@ func (sc *ServiceContext) initializeComponents() error {
 		return fmt.Errorf("storage initialization failed: %w", err)
 	}
 	sc.arbitrageCalculator = service.NewArbitrageCalculator(0.0002) // 默认手续费 0.02%
-	sc.arbitrageExecutor = domainservice.NewArbitrageExecutor()
 
 	// 从 WebSocket 管理器中提取 PriceFeed 列表（保持兼容性）
 	feeds := extractPriceFeedsFromWSManager(sc.Config.GetEnabledExchanges(), sc.wsManager)
@@ -235,7 +233,6 @@ func (sc *ServiceContext) BuildMonitorServiceDeps() monitor.ServiceDeps {
 		Repo:           sc.sqliteRepo,
 		ArbitrageRepo:  sc.sqliteArbRepo,
 		ArbitrageCalc:  sc.arbitrageCalculator,
-		OrderManager:   sc.perpetualOrderManager,
 		Executor:       sc.arbitrageExecutor,
 	}
 }
@@ -342,6 +339,20 @@ func extractPriceFeedsFromWSManager(enabledExchanges []string, wsm *websocket.We
 	return feeds
 }
 
+// initializeSink 初始化 Sink，支持 console 和飞书输出
+func initializeSink(cfg *config.Config) port.Sink {
+	consoleSink := console.NewSink()
+
+	// 如果配置了飞书，创建飞书 Sink（包含 consoleSink）
+	if len(cfg.Message.Feishu) > 0 {
+		notificationSink := notification.NewSink(consoleSink, cfg.Message.Feishu)
+		log.Info().Int("channels", len(cfg.Message.Feishu)).Msg("✓ Feishu sink initialized")
+		return notificationSink
+	}
+
+	return consoleSink
+}
+
 // ============================================
 // Helper Functions: 构建业务组件
 // ============================================
@@ -419,17 +430,3 @@ func extractPriceFeedsFromWSManager(enabledExchanges []string, wsm *websocket.We
 // 	// 如果有多于两个交易所，使用新的构造函数支持所有交易所
 // 	return domainservice.NewOrderManagerWithClients(clients), nil
 // }
-
-// initializeSink 初始化 Sink，支持 console 和飞书输出
-func initializeSink(cfg *config.Config) port.Sink {
-	consoleSink := console.NewSink()
-
-	// 如果配置了飞书，创建飞书 Sink（包含 consoleSink）
-	if len(cfg.Message.Feishu) > 0 {
-		notificationSink := notification.NewSink(consoleSink, cfg.Message.Feishu)
-		log.Info().Int("channels", len(cfg.Message.Feishu)).Msg("✓ Feishu sink initialized")
-		return notificationSink
-	}
-
-	return consoleSink
-}

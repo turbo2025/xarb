@@ -26,21 +26,20 @@ type ServiceDeps struct {
 	Repo           port.Repository
 	ArbitrageRepo  port.ArbitrageRepository         // 套利仓储
 	ArbitrageCalc  *service.ArbitrageCalculator     // 套利计算器
-	OrderManager   *domainservice.OrderManager      // Order executor (perpetual)
 	Executor       *domainservice.ArbitrageExecutor // 套利分析器
-	AccountManager *domainservice.AccountManager    // 账户管理器（可选）
+	// AccountManager *domainservice.AccountManager    // 账户管理器（可选）
 }
 
 type Service struct {
-	deps     ServiceDeps
-	st       *State
-	fmt      *Formatter
-	lastBand map[string]int  // -1/0/+1
-	seenBand map[string]bool // 是否已建立基线
+	deps     ServiceDeps     // 依赖项（Feeds、Sink、Repository等）
+	st       *State          // 监控状态（当前价格、对价差等）
+	fmt      *Formatter      // 输出格式化器
+	lastBand map[string]int  // 分布带记忆：-1（低）、0（中）、+1（高）
+	seenBand map[string]bool // 是否已建立基线（防止冷启动误报）
 
 	// 用于订单执行的价格缓存
-	pricesLock sync.RWMutex
-	prices     map[string]map[string]float64 // symbol -> exchange -> price
+	pricesLock sync.RWMutex                  // 并发读写锁
+	prices     map[string]map[string]float64 // 价格缓存：symbol → exchange → price
 }
 
 func NewService(deps ServiceDeps) *Service {
@@ -189,9 +188,9 @@ func (s *Service) Run(ctx context.Context) error {
 
 			// 穿越阈值：band 变化且新 band != 0 才发信号
 			if band != prevBand && band != 0 {
-				payload := s.fmt.Render(s.st, RenderSnapshot) // 用快照格式（无 \r / 清行）
+				// payload := s.fmt.Render(s.st, RenderSnapshot) // 用快照格式（无 \r / 清行）
 				// ⚠️ 信号直接打到 console（一次）
-				s.deps.Sink.NewLine()
+				_ = s.deps.Sink.NewLine()
 				log.Warn().
 					Str("symbol", t.Symbol).
 					Float64("delta", delta).
@@ -200,10 +199,10 @@ func (s *Service) Run(ctx context.Context) error {
 					Msg("arbitrage signal detected")
 
 				// 发送飞书通知（如果配置了飞书）
-				s.sendFeishuSignal(t.Symbol, delta, payload)
+				// s.sendFeishuSignal(t.Symbol, delta, payload)
 
 				// ✅ 新增：检测到套利机会，执行订单！
-				if s.deps.OrderManager != nil && s.deps.Executor != nil {
+				if s.deps.Executor != nil {
 					s.handleArbitrageSignal(ctx, t.Symbol, delta)
 				}
 			}
@@ -263,38 +262,6 @@ func (s *Service) handleArbitrageSignal(ctx context.Context, symbol string, delt
 		Float64("spread", priceDiff).
 		Float64("spread_rate%", spreadRate).
 		Msg("🎯 Arbitrage signal detected - ready to execute")
-
-	// 调用 OrderManager 执行套利交易
-	execution, err := s.deps.OrderManager.ExecuteArbitrage(
-		ctx,
-		s.deps.Executor,
-		symbol,
-		price1,
-		price2,
-		1.0, // 默认数量，可从配置读取
-	)
-
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("symbol", symbol).
-			Msg("❌ arbitrage execution failed")
-		return
-	}
-
-	// ✅ 订单执行成功，记录信息
-	log.Info().
-		Str("symbol", execution.Symbol).
-		Str("direction", execution.Direction).
-		Float64("quantity", execution.Quantity).
-		Str("buy_order_id", execution.BuyOrderID).
-		Str("sell_order_id", execution.SellOrderID).
-		Float64("expected_profit", execution.ExpectedProfit).
-		Float64("expected_profit_rate", execution.ExpectedProfitRate).
-		Msg("✓ arbitrage order executed successfully")
-
-	// ✅ 通过 API 验证订单状态
-	s.verifyOrderExecution(ctx, symbol, execution)
 }
 
 // getTradeExchanges 获取要执行交易的交易所列表
@@ -322,57 +289,6 @@ func (s *Service) getTradeExchanges(prices map[string]float64) []string {
 		result = result[:2]
 	}
 	return result
-}
-
-// verifyOrderExecution 通过 API 验证订单执行状态
-func (s *Service) verifyOrderExecution(ctx context.Context, symbol string, execution *domainservice.ArbitrageExecution) {
-	// 短暂延迟，等待订单在交易所确认
-	time.Sleep(500 * time.Millisecond)
-
-	// 验证买单状态（Binance）
-	buyStatus, err := s.deps.OrderManager.GetOrderStatus(ctx, "binance", symbol, execution.BuyOrderID)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("symbol", symbol).
-			Str("order_id", execution.BuyOrderID).
-			Msg("❌ failed to verify buy order")
-		return
-	}
-
-	log.Info().
-		Str("symbol", symbol).
-		Str("order_id", execution.BuyOrderID).
-		Str("status", buyStatus.Status).
-		Float64("executed_qty", buyStatus.ExecutedQuantity).
-		Float64("avg_price", buyStatus.AvgExecutedPrice).
-		Msg("✓ buy order verified (Binance)")
-
-	// 验证卖单状态（Bybit）
-	sellStatus, err := s.deps.OrderManager.GetOrderStatus(ctx, "bybit", symbol, execution.SellOrderID)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("symbol", symbol).
-			Str("order_id", execution.SellOrderID).
-			Msg("❌ failed to verify sell order")
-		return
-	}
-
-	log.Info().
-		Str("symbol", symbol).
-		Str("order_id", execution.SellOrderID).
-		Str("status", sellStatus.Status).
-		Float64("executed_qty", sellStatus.ExecutedQuantity).
-		Float64("avg_price", sellStatus.AvgExecutedPrice).
-		Msg("✓ sell order verified (Bybit)")
-
-	// ✅ 两个订单都已验证成功
-	log.Info().
-		Str("symbol", symbol).
-		Float64("expected_profit", execution.ExpectedProfit).
-		Float64("realized_profit", calculateRealizedProfit(buyStatus, sellStatus)).
-		Msg("✅ arbitrage cycle completed and verified")
 }
 
 // calculateRealizedProfit 计算实际利润

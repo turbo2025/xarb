@@ -83,7 +83,7 @@ func (s *Sink) SendSignal(symbol string, delta float64, payload string) error {
 		return nil
 	}
 
-	title := "🎯 Arbitrage Signal Detected"
+	title := "🎯 Arbitrage Signal Detected [" + time.Now().Format("2006-01-02 15:04:05") + "]"
 	// 清理 payload 中的 ANSI 颜色编码
 	cleanPayload := stripANSI(payload)
 	content := []string{
@@ -106,7 +106,7 @@ func (s *Sink) SendOrder(orderInfo string) error {
 		return nil
 	}
 
-	title := "📋 Order Executed"
+	title := "📋 Order Executed [" + time.Now().Format("2006-01-02 15:04:05") + "]"
 	content := []string{orderInfo}
 
 	return client.SendPost(title, content)
@@ -120,7 +120,7 @@ func (s *Sink) SendPnL(pnlInfo string) error {
 		return nil
 	}
 
-	title := "💰 P&L Update"
+	title := "💰 P&L Update [" + time.Now().Format("2006-01-02 15:04:05") + "]"
 	content := []string{pnlInfo}
 
 	return client.SendPost(title, content)
@@ -134,7 +134,7 @@ func (s *Sink) SendMarket(marketInfo string) error {
 		return nil
 	}
 
-	title := "📈 Market Update"
+	title := "📈 Market Update [" + time.Now().Format("2006-01-02 15:04:05") + "]"
 	content := []string{marketInfo}
 
 	return client.SendPost(title, content)
