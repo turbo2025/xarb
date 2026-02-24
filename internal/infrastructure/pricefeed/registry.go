@@ -8,7 +8,8 @@ import (
 
 // factory函数类型
 // wsURL: WebSocket连接URL
-type Factory func(wsURL string) port.PriceFeed
+// tradeType: 交易类型 ("spot" 或 "perpetual")
+type Factory func(wsURL string, tradeType string) port.PriceFeed
 
 // registry maps exchange names to their respective price feed factories
 var registry = make(map[string]Factory)

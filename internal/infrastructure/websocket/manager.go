@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -38,19 +39,18 @@ type WebSocketClients struct {
 }
 
 // WebSocketManager 统一管理所有交易所的 WebSocket 连接（价格源、订单簿等）
-// 使用 map 存储，支持动态扩展而无需修改结构体
+// 使用嵌套 map 存储，支持每个交易所同时有多种交易类型（Spot/Perpetual）
 type WebSocketManager struct {
-	spotClients      map[string]*WebSocketClients
-	perpetualClients map[string]*WebSocketClients
-	retryConfig      RetryConfig
+	// clients[exchangeName][tradeType] = *WebSocketClients
+	clients     map[string]map[string]*WebSocketClients
+	retryConfig RetryConfig
 }
 
 // NewWebSocketManager 创建 WebSocket 管理器
 func NewWebSocketManager() *WebSocketManager {
 	return &WebSocketManager{
-		spotClients:      make(map[string]*WebSocketClients),
-		perpetualClients: make(map[string]*WebSocketClients),
-		retryConfig:      DefaultRetryConfig,
+		clients:     make(map[string]map[string]*WebSocketClients),
+		retryConfig: DefaultRetryConfig,
 	}
 }
 
@@ -69,27 +69,50 @@ func (m *WebSocketManager) Initialize(cfg *config.Config) error {
 	// 为各交易所初始化符号转换器（一次性初始化，避免重复）
 	initializeExchangeConverters(strings.TrimSpace(cfg.Symbols.Quote), enabledExchanges)
 
-	// 定义要初始化的交易类型配置
-	type tradeTypeConfig struct {
-		name    string
-		wsURL   string
-		clients map[string]*WebSocketClients
-	}
-
 	for _, exchangeName := range enabledExchanges {
 		exchCfg := cfg.Exchanges[exchangeName]
 
-		// 遍历所有交易类型（Spot 和 Perpetual），暂时只有 Perpetual，Spot 可以后续添加
-		configs := []tradeTypeConfig{
-			// {name: application.TradeTypeSpot, wsURL: exchCfg.SpotWsURL, clients: m.spotClients},
-			{name: application.TradeTypePerpetual, wsURL: exchCfg.PerpetualWsURL, clients: m.perpetualClients},
+		// 遍历不同交易类型（Spot 和 Perpetual）
+		// 使用反射动态获取ExchangeConfig中的TradeConfig字段
+		tradeConfigs := []struct {
+			name   string
+			config config.TradeConfig
+		}{}
+
+		// 使用反射遍历ExchangeConfig的所有字段
+		exchValue := reflect.ValueOf(exchCfg)
+		exchType := reflect.TypeOf(exchCfg)
+
+		for i := 0; i < exchType.NumField(); i++ {
+			field := exchType.Field(i)
+			// 检查字段是否是TradeConfig类型
+			if field.Type == reflect.TypeOf(config.TradeConfig{}) {
+				fieldName := strings.ToLower(field.Name)
+				fieldValue := exchValue.Field(i).Interface().(config.TradeConfig)
+
+				// 只添加配置中启用且有效的交易类型
+				if fieldValue.Enabled && strings.TrimSpace(fieldValue.WS) != "" {
+					tradeConfigs = append(tradeConfigs, struct {
+						name   string
+						config config.TradeConfig
+					}{
+						name:   fieldName,
+						config: fieldValue,
+					})
+				}
+			}
 		}
 
-		for _, tc := range configs {
-			if tc.wsURL == "" {
+		for _, tc := range tradeConfigs {
+			// 检查enabled标志和WebSocket URL
+			if !tc.config.Enabled {
+				log.Debug().Str("exchange", exchangeName).Str("type", tc.name).Msg("websocket disabled in config")
 				continue
 			}
-			if err := m.registerWebSocketWithRetry(exchangeName, tc.wsURL, tc.name, tc.clients); err != nil {
+			if strings.TrimSpace(tc.config.WS) == "" {
+				continue
+			}
+			if err := m.registerWebSocketWithRetry(exchangeName, tc.config.WS, tc.name); err != nil {
 				log.Error().Err(err).
 					Str("exchange", exchangeName).
 					Str("type", tc.name).
@@ -116,7 +139,7 @@ func (m *WebSocketManager) Initialize(cfg *config.Config) error {
 }
 
 // registerWebSocketWithRetry 带重试的 WebSocket 连接注册
-func (m *WebSocketManager) registerWebSocketWithRetry(exchangeName, wsURL, tradeType string, clients map[string]*WebSocketClients) error {
+func (m *WebSocketManager) registerWebSocketWithRetry(exchangeName, wsURL, tradeType string) error {
 	var lastErr error
 	delay := m.retryConfig.InitialDel
 
@@ -136,7 +159,7 @@ func (m *WebSocketManager) registerWebSocketWithRetry(exchangeName, wsURL, trade
 			}
 		}
 
-		if err := m.registerWebSocket(exchangeName, wsURL, tradeType, clients); err != nil {
+		if err := m.registerWebSocket(exchangeName, wsURL, tradeType); err != nil {
 			lastErr = err
 			continue
 		}
@@ -149,28 +172,49 @@ func (m *WebSocketManager) registerWebSocketWithRetry(exchangeName, wsURL, trade
 }
 
 // registerWebSocket 注册 WebSocket 连接的通用方法
-func (m *WebSocketManager) registerWebSocket(exchangeName string, wsURL string, tradeType string, clients map[string]*WebSocketClients) error {
+// tradeType: "spot" 或 "perpetual"
+func (m *WebSocketManager) registerWebSocket(exchangeName string, wsURL string, tradeType string) error {
 	factory, ok := pricefeed.Get(exchangeName)
 	if !ok {
 		return fmt.Errorf("price feed factory not registered for exchange: %s", exchangeName)
 	}
 
-	priceFeed := factory(wsURL)
-	clients[exchangeName] = &WebSocketClients{PriceFeed: priceFeed}
-	log.Info().Str("exchange", exchangeName).Msg("✓ " + exchangeName + " " + tradeType + " websocket initialized")
+	// 创建 PriceFeed 时传递 tradeType，让工厂正确处理 spot 还是 perpetual
+	priceFeed := factory(wsURL, tradeType)
+
+	// 初始化该交易所的map（如果还未初始化）
+	if m.clients[exchangeName] == nil {
+		m.clients[exchangeName] = make(map[string]*WebSocketClients)
+	}
+
+	// 在该交易所的map中存储该交易类型的客户端
+	m.clients[exchangeName][tradeType] = &WebSocketClients{PriceFeed: priceFeed}
+	log.Info().
+		Str("exchange", exchangeName).
+		Str("type", tradeType).
+		Msg("✓ websocket initialized")
 	return nil
 }
 
 // Getter 方法
 
+// GetClient 获取指定交易所和交易类型的 WebSocket 客户端
+// tradeType: "spot" 或 "perpetual"
+func (m *WebSocketManager) GetClient(exchangeName, tradeType string) *WebSocketClients {
+	if exchange, ok := m.clients[exchangeName]; ok {
+		return exchange[tradeType]
+	}
+	return nil
+}
+
 // GetSpotClient 获取指定交易所的现货 WebSocket 客户端
 func (m *WebSocketManager) GetSpotClient(exchangeName string) *WebSocketClients {
-	return m.spotClients[exchangeName]
+	return m.GetClient(exchangeName, application.TradeTypeSpot)
 }
 
 // GetPerpetualClient 获取指定交易所的永续合约 WebSocket 客户端
 func (m *WebSocketManager) GetPerpetualClient(exchangeName string) *WebSocketClients {
-	return m.perpetualClients[exchangeName]
+	return m.GetClient(exchangeName, application.TradeTypePerpetual)
 }
 
 // initializeExchangeConverters 为各交易所初始化符号转换器

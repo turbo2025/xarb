@@ -9,12 +9,22 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// TradeConfig 交易类型配置（Spot或Perpetual）
+type TradeConfig struct {
+	Enabled bool   `toml:"enabled"`
+	HTTP    string `toml:"http"`
+	WS      string `toml:"ws"`
+}
+
 // ExchangeConfig 交易所配置（通用格式）
 type ExchangeConfig struct {
-	Enabled          bool   `toml:"enabled"`
-	APIKey           string `toml:"api_key"`
-	SecretKey        string `toml:"secret_key"`
-	Passphrase       string `toml:"passphrase"` // 仅 OKX、Bitget 需要
+	Enabled    bool        `toml:"enabled"`
+	APIKey     string      `toml:"api_key"`
+	SecretKey  string      `toml:"secret_key"`
+	Passphrase string      `toml:"passphrase"` // 仅 OKX、Bitget 需要
+	Spot       TradeConfig `toml:"spot"`
+	Perpetual  TradeConfig `toml:"perpetual"`
+	// 以下字段保留用于向后兼容
 	SpotHttpURL      string `toml:"spot_http_url"`
 	SpotWsURL        string `toml:"spot_ws_url"`
 	PerpetualHttpURL string `toml:"perpetual_http_url"`
@@ -121,8 +131,16 @@ func validate(cfg *Config) error {
 		if !exchCfg.Enabled {
 			continue
 		}
-		if strings.TrimSpace(exchCfg.PerpetualWsURL) == "" {
-			return fmt.Errorf("exchange.%s.perpetual_ws_url empty but enabled", exchangeName)
+		// 至少需要启用spot或perpetual中的一个
+		if !exchCfg.Spot.Enabled && !exchCfg.Perpetual.Enabled {
+			return fmt.Errorf("exchange.%s: at least one of spot or perpetual must be enabled", exchangeName)
+		}
+		// 检查启用的交易类型是否有有效的WebSocket URL
+		if exchCfg.Spot.Enabled && strings.TrimSpace(exchCfg.Spot.WS) == "" {
+			return fmt.Errorf("exchange.%s.spot.ws empty but spot enabled", exchangeName)
+		}
+		if exchCfg.Perpetual.Enabled && strings.TrimSpace(exchCfg.Perpetual.WS) == "" {
+			return fmt.Errorf("exchange.%s.perpetual.ws empty but perpetual enabled", exchangeName)
 		}
 	}
 

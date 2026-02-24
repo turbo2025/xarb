@@ -34,11 +34,9 @@ type ServiceContext struct {
 	sqliteArbRepo *sqliterepo.ArbitrageRepo
 
 	// 应用业务组件（依赖基础设施）
-	Sink                port.Sink
-	priceFeeds          []monitor.PriceFeed
-	arbitrageCalculator *service.ArbitrageCalculator
-	arbitrageExecutor   *domainservice.ArbitrageExecutor
-	monitorService      *monitor.Service
+	Sink           port.Sink
+	priceFeeds     []monitor.PriceFeed
+	monitorService *monitor.Service
 
 	// 可运行的服务列表（便于扩展）
 	runnableServices []Runnable
@@ -96,7 +94,6 @@ func (sc *ServiceContext) initializeComponents() error {
 	if err := sc.initializeStorage(); err != nil {
 		return fmt.Errorf("storage initialization failed: %w", err)
 	}
-	sc.arbitrageCalculator = service.NewArbitrageCalculator(0.0002) // 默认手续费 0.02%
 
 	// 从 WebSocket 管理器中提取 PriceFeed 列表（保持兼容性）
 	feeds := extractPriceFeedsFromWSManager(sc.Config.GetEnabledExchanges(), sc.wsManager)
@@ -223,6 +220,10 @@ func (sc *ServiceContext) GetSQLiteRepo() *sqliterepo.Repo {
 // 这个方法由 Application 层 UseCase 调用
 // 返回一个完整的、经过验证的依赖集合
 func (sc *ServiceContext) BuildMonitorServiceDeps() monitor.ServiceDeps {
+	// 创建套利计算器和执行器（Monitor Service 的内部依赖）
+	arbitrageCalc := service.NewArbitrageCalculator(0.0002) // 默认手续费 0.02%
+	arbitrageExec := domainservice.NewArbitrageExecutor()
+
 	return monitor.ServiceDeps{
 		Exchanges:      sc.Config.GetEnabledExchanges(), // 使用从config中获取的enabled交易所列表
 		Feeds:          sc.priceFeeds,
@@ -232,12 +233,11 @@ func (sc *ServiceContext) BuildMonitorServiceDeps() monitor.ServiceDeps {
 		Sink:           sc.Sink,
 		Repo:           sc.sqliteRepo,
 		ArbitrageRepo:  sc.sqliteArbRepo,
-		ArbitrageCalc:  sc.arbitrageCalculator,
-		Executor:       sc.arbitrageExecutor,
+		ArbitrageCalc:  arbitrageCalc,
+		ArbitrageExec:  arbitrageExec,
+		OrderManager:   nil, // TODO: 从 apiClients 创建 OrderManager
 	}
 }
-
-// GetPriceFeeds 获取已初始化的价格源
 func (sc *ServiceContext) GetPriceFeeds() []monitor.PriceFeed {
 	return sc.priceFeeds
 }
@@ -245,11 +245,6 @@ func (sc *ServiceContext) GetPriceFeeds() []monitor.PriceFeed {
 // GetWebSocketManager 获取 WebSocket 管理器
 func (sc *ServiceContext) GetWebSocketManager() *websocket.WebSocketManager {
 	return sc.wsManager
-}
-
-// GetArbitrageCalculator 获取套利计算器
-func (sc *ServiceContext) GetArbitrageCalculator() *service.ArbitrageCalculator {
-	return sc.arbitrageCalculator
 }
 
 // GetMonitorService 获取监控服务

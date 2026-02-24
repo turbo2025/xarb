@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -25,9 +26,9 @@ type ServiceDeps struct {
 	Sink           port.Sink
 	Repo           port.Repository
 	ArbitrageRepo  port.ArbitrageRepository         // 套利仓储
-	ArbitrageCalc  *service.ArbitrageCalculator     // 套利计算器
-	Executor       *domainservice.ArbitrageExecutor // 套利分析器
-	// AccountManager *domainservice.AccountManager    // 账户管理器（可选）
+	ArbitrageCalc  *service.ArbitrageCalculator     // 价差和收益率计算
+	ArbitrageExec  *domainservice.ArbitrageExecutor // 费用和利润计算、下单决策
+	OrderManager   *domainservice.OrderManager      // 订单执行（下单、订单验证）
 }
 
 type Service struct {
@@ -202,7 +203,7 @@ func (s *Service) Run(ctx context.Context) error {
 				// s.sendFeishuSignal(t.Symbol, delta, payload)
 
 				// ✅ 新增：检测到套利机会，执行订单！
-				if s.deps.Executor != nil {
+				if s.deps.OrderManager != nil {
 					s.handleArbitrageSignal(ctx, t.Symbol, delta)
 				}
 			}
@@ -213,7 +214,7 @@ func (s *Service) Run(ctx context.Context) error {
 	}
 }
 
-// handleArbitrageSignal 处理套利信号：执行订单并验证
+// handleArbitrageSignal 处理套利信号：执行下单并发送通知
 func (s *Service) handleArbitrageSignal(ctx context.Context, symbol string, delta float64) {
 	s.pricesLock.RLock()
 	prices := s.prices[symbol]
@@ -262,6 +263,75 @@ func (s *Service) handleArbitrageSignal(ctx context.Context, symbol string, delt
 		Float64("spread", priceDiff).
 		Float64("spread_rate%", spreadRate).
 		Msg("🎯 Arbitrage signal detected - ready to execute")
+
+	// 检查当前持仓：如果已有持仓则不下单
+	if hasPosition, err := s.checkExistingPosition(ctx, symbol); err != nil {
+		log.Error().Err(err).Str("symbol", symbol).Msg("failed to check positions")
+		return
+	} else if hasPosition {
+		log.Warn().Str("symbol", symbol).Msg("already have open position, skip arbitrage order")
+		return
+	}
+
+	// 执行套利交易
+	execution, err := s.deps.OrderManager.ExecuteArbitrage(
+		ctx,
+		s.deps.ArbitrageExec,
+		symbol,
+		price1,
+		price2,
+		1.0, // 默认数量，可从配置读取
+	)
+
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("symbol", symbol).
+			Msg("❌ arbitrage execution failed")
+		return
+	}
+
+	// ✅ 订单执行成功，记录信息
+	log.Info().
+		Str("symbol", execution.Symbol).
+		Str("direction", execution.Direction).
+		Float64("quantity", execution.Quantity).
+		Str("buy_order_id", execution.BuyOrderID).
+		Str("sell_order_id", execution.SellOrderID).
+		Float64("expected_profit", execution.ExpectedProfit).
+		Float64("expected_profit_rate", execution.ExpectedProfitRate).
+		Msg("✓ arbitrage order executed successfully")
+
+	// 发送订单通知到飞书
+	orderInfo := formatOrderInfo(execution)
+	s.sendOrderNotification(orderInfo)
+}
+
+// formatOrderInfo 格式化订单信息
+func formatOrderInfo(execution *domainservice.ArbitrageExecution) string {
+	return fmt.Sprintf(
+		"Symbol: %s\nDirection: %s\nQuantity: %.4f\nBuy Order: %s\nSell Order: %s\nExpected Profit: %.2f (%.2f%%)",
+		execution.Symbol,
+		execution.Direction,
+		execution.Quantity,
+		execution.BuyOrderID,
+		execution.SellOrderID,
+		execution.ExpectedProfit,
+		execution.ExpectedProfitRate,
+	)
+}
+
+// sendOrderNotification 发送订单通知到飞书
+func (s *Service) sendOrderNotification(orderInfo string) {
+	type OrderSender interface {
+		SendOrder(orderInfo string) error
+	}
+
+	if orderSender, ok := s.deps.Sink.(OrderSender); ok {
+		if err := orderSender.SendOrder(orderInfo); err != nil {
+			log.Error().Err(err).Msg("failed to send order notification to feishu")
+		}
+	}
 }
 
 // getTradeExchanges 获取要执行交易的交易所列表
@@ -298,6 +368,14 @@ func calculateRealizedProfit(buyStatus, sellStatus *domainservice.OrderStatus) f
 	}
 	// 简化版本：卖出收入 - 买入成本
 	return (sellStatus.AvgExecutedPrice - buyStatus.AvgExecutedPrice) * buyStatus.ExecutedQuantity
+}
+
+// checkExistingPosition 检查两个交易所是否已有该币种的持仓
+// 返回 true 表示已有持仓，false 表示无持仓
+func (s *Service) checkExistingPosition(ctx context.Context, symbol string) (bool, error) {
+	// TODO: 从 OrderManager 或 PositionManager 获取 Binance 和 Bybit 的持仓
+	// 目前返回 false（无持仓），待实现
+	return false, nil
 }
 
 // sendFeishuSignal 发送套利信号到飞书
