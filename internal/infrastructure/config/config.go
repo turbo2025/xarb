@@ -24,11 +24,6 @@ type ExchangeConfig struct {
 	Passphrase string      `toml:"passphrase"` // 仅 OKX、Bitget 需要
 	Spot       TradeConfig `toml:"spot"`
 	Perpetual  TradeConfig `toml:"perpetual"`
-	// 以下字段保留用于向后兼容
-	SpotHttpURL      string `toml:"spot_http_url"`
-	SpotWsURL        string `toml:"spot_ws_url"`
-	PerpetualHttpURL string `toml:"perpetual_http_url"`
-	PerpetualWsURL   string `toml:"perpetual_ws_url"`
 }
 
 type Config struct {

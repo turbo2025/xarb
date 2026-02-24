@@ -40,11 +40,11 @@ exchanges = []
 enabled = false
 api_key = "GODOZ5H4IQVahtXu216X5kdQBTbYT4tNf5LydQWuxexlMJZrw0xbQvrL1BP1PunN"
 secret_key = "j14JDmShOc6SUppf6Uz4vhnQwsbUGK6f2NzfTV4hGcnkwCJaXq8OtNbZUx5gLINU"
-[[exchanges.binance.spot]]
+[exchanges.binance.spot]
 enabled = true
 http = "https://api.binance.com"
 ws = "wss://stream.binance.com:443/ws"
-[[exchanges.binance.perpetual]]
+[exchanges.binance.perpetual]
 enabled = true
 http = "https://fapi.binance.com"
 ws = "wss://fstream.binance.com/ws"
@@ -54,11 +54,11 @@ ws = "wss://fstream.binance.com/ws"
 enabled = true
 api_key = "ovxG4pT6BFE8Oh7b7E"
 secret_key = "gPfgyDrfR4WswFdPgVpXsbnSEQeaCcX30Lsu"
-[[exchanges.bybit.spot]]
+[exchanges.bybit.spot]
 enabled = false
 http = "https://api.bybit.com"
 ws = "wss://stream.bybit.com/v5/public/spot"
-[[exchanges.bybit.perpetual]]
+[exchanges.bybit.perpetual]
 enabled = true
 http = "https://api.bybit.com"
 ws = "wss://stream.bybit.com/v5/public/linear"
@@ -68,11 +68,11 @@ enabled = true
 api_key = "dc6a2205-830f-4952-9acd-81d5b9ea2470"
 secret_key = "6218E25764E121957B36D854B4776FEC"
 passphrase = "Trade123@"
-[[exchanges.okx.spot]]
+[exchanges.okx.spot]
 enabled = false
 http = "https://www.okx.com"
 ws = "wss://ws.okx.com:8443/ws/v5/public"
-[[exchanges.okx.perpetual]]
+[exchanges.okx.perpetual]
 enabled = true
 http = "https://www.okx.com"
 ws = "wss://ws.okx.com:8443/ws/v5/public"
@@ -82,11 +82,11 @@ enabled = false
 api_key = "bg_6fe0bc583114ca91cb35c4c5a33b1c3d"
 secret_key = "50ec0bdaaa0d43e301fdf286029da7029b5d33dedd412d60e408c88624484710"
 passphrase = "Box2024btc"
-[[exchanges.bitget.spot]]
+[exchanges.bitget.spot]
 enabled = false
 http = "https://api.bitget.com"
 ws = "wss://ws.bitget.com/v2/ws/public"
-[[exchanges.bitget.perpetual]]
+[exchanges.bitget.perpetual]
 enabled = false
 http = "https://api.bitget.com"
 ws = "wss://ws.bitget.com/v2/ws/public"

@@ -70,8 +70,6 @@ func (m *WebSocketManager) Initialize(cfg *config.Config) error {
 	initializeExchangeConverters(strings.TrimSpace(cfg.Symbols.Quote), enabledExchanges)
 
 	for _, exchangeName := range enabledExchanges {
-		exchCfg := cfg.Exchanges[exchangeName]
-
 		// 遍历不同交易类型（Spot 和 Perpetual）
 		// 使用反射动态获取ExchangeConfig中的TradeConfig字段
 		tradeConfigs := []struct {
@@ -79,9 +77,11 @@ func (m *WebSocketManager) Initialize(cfg *config.Config) error {
 			config config.TradeConfig
 		}{}
 
+		exchCfg := cfg.Exchanges[exchangeName]
+
 		// 使用反射遍历ExchangeConfig的所有字段
-		exchValue := reflect.ValueOf(exchCfg)
 		exchType := reflect.TypeOf(exchCfg)
+		exchValue := reflect.ValueOf(exchCfg)
 
 		for i := 0; i < exchType.NumField(); i++ {
 			field := exchType.Field(i)
@@ -134,7 +134,6 @@ func (m *WebSocketManager) Initialize(cfg *config.Config) error {
 			Strs("failed_exchanges", failedExchanges).
 			Msg("some exchanges failed to initialize websocket, but others succeeded")
 	}
-
 	return nil
 }
 
@@ -207,14 +206,22 @@ func (m *WebSocketManager) GetClient(exchangeName, tradeType string) *WebSocketC
 	return nil
 }
 
-// GetSpotClient 获取指定交易所的现货 WebSocket 客户端
-func (m *WebSocketManager) GetSpotClient(exchangeName string) *WebSocketClients {
-	return m.GetClient(exchangeName, application.TradeTypeSpot)
-}
+// GetAllPriceFeeds 获取所有已初始化的PriceFeed
+// 动态遍历所有交易所和交易类型的组合，返回有效的PriceFeed列表
+func (m *WebSocketManager) GetAllPriceFeeds() []port.PriceFeed {
+	var feeds []port.PriceFeed
 
-// GetPerpetualClient 获取指定交易所的永续合约 WebSocket 客户端
-func (m *WebSocketManager) GetPerpetualClient(exchangeName string) *WebSocketClients {
-	return m.GetClient(exchangeName, application.TradeTypePerpetual)
+	// 遍历所有交易所
+	for _, exchClients := range m.clients {
+		// 遍历该交易所的所有交易类型
+		for _, wsClients := range exchClients {
+			if wsClients != nil && wsClients.PriceFeed != nil {
+				feeds = append(feeds, wsClients.PriceFeed)
+			}
+		}
+	}
+
+	return feeds
 }
 
 // initializeExchangeConverters 为各交易所初始化符号转换器

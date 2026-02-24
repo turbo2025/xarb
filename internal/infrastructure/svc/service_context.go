@@ -95,8 +95,8 @@ func (sc *ServiceContext) initializeComponents() error {
 		return fmt.Errorf("storage initialization failed: %w", err)
 	}
 
-	// 从 WebSocket 管理器中提取 PriceFeed 列表（保持兼容性）
-	feeds := extractPriceFeedsFromWSManager(sc.Config.GetEnabledExchanges(), sc.wsManager)
+	// 从 WebSocket 管理器中提取 PriceFeed 列表（动态获取所有已初始化的PriceFeed）
+	feeds := sc.wsManager.GetAllPriceFeeds()
 	if len(feeds) == 0 {
 		return ErrNoFeedsEnabled
 	}
@@ -314,24 +314,6 @@ func (sc *ServiceContext) Close() error {
 	}
 
 	return nil
-}
-
-// extractPriceFeedsFromWSManager 从 WebSocket 管理器中提取所有已初始化的 PriceFeed
-// 动态遍历所有交易所的现货和合约连接，自动适配新增的交易所
-func extractPriceFeedsFromWSManager(enabledExchanges []string, wsm *websocket.WebSocketManager) []monitor.PriceFeed {
-	var feeds []monitor.PriceFeed
-	for _, exchange := range enabledExchanges {
-		// 检查现货 WebSocket 连接
-		if clients := wsm.GetSpotClient(exchange); clients != nil && clients.PriceFeed != nil {
-			feeds = append(feeds, clients.PriceFeed)
-		}
-		// 检查合约 WebSocket 连接
-		if clients := wsm.GetPerpetualClient(exchange); clients != nil && clients.PriceFeed != nil {
-			feeds = append(feeds, clients.PriceFeed)
-		}
-	}
-
-	return feeds
 }
 
 // initializeSink 初始化 Sink，支持 console 和飞书输出

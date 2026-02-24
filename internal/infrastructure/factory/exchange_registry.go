@@ -90,9 +90,6 @@ func (r *ExchangeClientRegistry) Register(exchangeName string, cfg *config.Excha
 	if cfg.APIKey == "" || cfg.SecretKey == "" {
 		return fmt.Errorf("%s: apiKey and apiSecret cannot be empty", exchangeName)
 	}
-	if cfg.PerpetualHttpURL == "" || cfg.SpotHttpURL == "" {
-		return fmt.Errorf("%s: PerpetualHttpURL and SpotHttpURL cannot be empty", exchangeName)
-	}
 	switch exchangeName {
 	case application.ExchangeBinance:
 		return r.RegisterBinance(cfg)
@@ -116,7 +113,7 @@ func (r *ExchangeClientRegistry) RegisterBinance(cfg *config.ExchangeConfig) err
 	}
 
 	// 创建两个 Manager（内部会共享 HTTP 客户端与凭证）
-	spotMgr, perpetualMgr := binance.NewManagers(cfg.APIKey, cfg.SecretKey, cfg.SpotHttpURL, cfg.PerpetualHttpURL)
+	spotMgr, perpetualMgr := binance.NewManagers(cfg.APIKey, cfg.SecretKey, cfg.Spot.HTTP, cfg.Perpetual.HTTP)
 
 	// 组装成强类型的客户端集合
 	r.binanceSpot = &BinanceSpotClients{
@@ -142,7 +139,7 @@ func (r *ExchangeClientRegistry) RegisterBybit(cfg *config.ExchangeConfig) error
 	}
 
 	// 创建两个 Manager（内部会共享 HTTP 客户端与凭证）
-	spotMgr, perpetualMgr := bybit.NewManagers(cfg.APIKey, cfg.SecretKey, cfg.SpotHttpURL, cfg.PerpetualHttpURL)
+	spotMgr, perpetualMgr := bybit.NewManagers(cfg.APIKey, cfg.SecretKey, cfg.Spot.HTTP, cfg.Perpetual.HTTP)
 
 	// 组装成强类型的客户端集合
 	r.bybitSpot = &BybitSpotClients{
@@ -197,7 +194,7 @@ func (r *ExchangeClientRegistry) RegisterOKX(cfg *config.ExchangeConfig) error {
 	}
 
 	// 创建两个 Manager（内部会共享 HTTP 客户端与凭证）
-	spotMgr, perpetualMgr := okx.NewManagers(cfg.APIKey, cfg.SecretKey, cfg.Passphrase, cfg.SpotHttpURL, cfg.PerpetualHttpURL)
+	spotMgr, perpetualMgr := okx.NewManagers(cfg.APIKey, cfg.SecretKey, cfg.Passphrase, cfg.Spot.HTTP, cfg.Perpetual.HTTP)
 
 	// 组装成强类型的客户端集合
 	r.okxSpot = &OKXSpotClients{
