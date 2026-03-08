@@ -3,6 +3,7 @@ package svc
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	redisclient "github.com/redis/go-redis/v9"
@@ -224,6 +225,14 @@ func (sc *ServiceContext) BuildMonitorServiceDeps() monitor.ServiceDeps {
 	arbitrageCalc := service.NewArbitrageCalculator(0.0002) // 默认手续费 0.02%
 	arbitrageExec := domainservice.NewArbitrageExecutor()
 
+	// 构建期货订单管理器
+	var orderManager *domainservice.OrderManager
+	if om, err := sc.buildFuturesOrderManager(); err != nil {
+		log.Warn().Err(err).Msg("failed to build order manager, arbitrage execution will be disabled")
+	} else {
+		orderManager = om
+	}
+
 	return monitor.ServiceDeps{
 		Exchanges:      sc.Config.GetEnabledExchanges(), // 使用从config中获取的enabled交易所列表
 		Feeds:          sc.priceFeeds,
@@ -235,7 +244,7 @@ func (sc *ServiceContext) BuildMonitorServiceDeps() monitor.ServiceDeps {
 		ArbitrageRepo:  sc.sqliteArbRepo,
 		ArbitrageCalc:  arbitrageCalc,
 		ArbitrageExec:  arbitrageExec,
-		OrderManager:   nil, // TODO: 从 apiClients 创建 OrderManager
+		OrderManager:   orderManager, // 现在被正确初始化
 	}
 }
 func (sc *ServiceContext) GetPriceFeeds() []monitor.PriceFeed {
@@ -336,74 +345,74 @@ func initializeSink(cfg *config.Config) port.Sink {
 
 // buildFuturesOrderManager 从 Registry 构建期货订单管理器
 // 支持动态初始化所有 enabled 的交易所，用于两两套利对比
-// func buildFuturesOrderManager(apiClients *factory.APIClients, cfg *config.Config) (*domainservice.OrderManager, error) {
-// 	clients := make(map[string]domainservice.OrderClient)
+func (sc *ServiceContext) buildFuturesOrderManager() (*domainservice.OrderManager, error) {
+	clients := make(map[string]domainservice.OrderClient)
 
-// 	// Iterate through all exchange configs and initialize perpetual clients for enabled exchanges
-// 	for exName, exCfg := range cfg.Exchanges {
-// 		if !exCfg.Enabled {
-// 			continue // 跳过未启用的交易所
-// 		}
+	// Iterate through all exchange configs and initialize perpetual clients for enabled exchanges
+	for exName, exCfg := range sc.Config.Exchanges {
+		if !exCfg.Enabled {
+			continue // 跳过未启用的交易所
+		}
 
-// 		exName = strings.ToUpper(exName)
+		exName = strings.ToUpper(exName)
 
-// 		// Check if exchange has perpetual client in Registry
-// 		var client domainservice.OrderClient
+		// Check if exchange has perpetual client in Registry
+		var client domainservice.OrderClient
 
-// 		switch exName {
-// 		case "BINANCE":
-// 			binanceClients := apiClients.ExchangeRegistry.BinancePerpetual()
-// 			if binanceClients != nil && binanceClients.Order != nil {
-// 				client = factory.NewBinanceOrderAdapter(binanceClients.Order)
-// 				clients["BINANCE"] = client
-// 				log.Info().Str("exchange", "BINANCE").Msg("✓ Perpetual order client initialized")
-// 			} else {
-// 				log.Warn().Str("exchange", "BINANCE").Msg("perpetual order client unavailable")
-// 			}
+		switch exName {
+		case "BINANCE":
+			binanceClients := sc.apiClients.ExchangeRegistry.BinancePerpetual()
+			if binanceClients != nil && binanceClients.Order != nil {
+				client = factory.NewBinanceOrderAdapter(binanceClients.Order)
+				clients["BINANCE"] = client
+				log.Info().Str("exchange", "BINANCE").Msg("✓ Perpetual order client initialized")
+			} else {
+				log.Warn().Str("exchange", "BINANCE").Msg("perpetual order client unavailable")
+			}
 
-// 		case "BYBIT":
-// 			bybitClients := apiClients.ExchangeRegistry.BybitPerpetual()
-// 			if bybitClients != nil && bybitClients.Order != nil {
-// 				client = factory.NewBybitOrderAdapter(bybitClients.Order)
-// 				clients["BYBIT"] = client
-// 				log.Info().Str("exchange", "BYBIT").Msg("✓ Perpetual order client initialized")
-// 			} else {
-// 				log.Warn().Str("exchange", "BYBIT").Msg("perpetual order client unavailable")
-// 			}
+		case "BYBIT":
+			bybitClients := sc.apiClients.ExchangeRegistry.BybitPerpetual()
+			if bybitClients != nil && bybitClients.Order != nil {
+				client = factory.NewBybitOrderAdapter(bybitClients.Order)
+				clients["BYBIT"] = client
+				log.Info().Str("exchange", "BYBIT").Msg("✓ Perpetual order client initialized")
+			} else {
+				log.Warn().Str("exchange", "BYBIT").Msg("perpetual order client unavailable")
+			}
 
-// 		case "OKX":
-// 			// OKX perpetual order adapter not yet implemented
-// 			log.Warn().Str("exchange", "OKX").Msg("perpetual order client not yet implemented")
+		case "OKX":
+			// OKX perpetual order adapter not yet implemented
+			log.Warn().Str("exchange", "OKX").Msg("perpetual order client not yet implemented")
 
-// 		case "BITGET":
-// 			// TODO: Implement Bitget perpetual order adapter
-// 			log.Warn().Str("exchange", "BITGET").Msg("perpetual order client not yet implemented")
+		case "BITGET":
+			// TODO: Implement Bitget perpetual order adapter
+			log.Warn().Str("exchange", "BITGET").Msg("perpetual order client not yet implemented")
 
-// 		default:
-// 			log.Warn().Str("exchange", exName).Msg("unknown exchange, skipping")
-// 		}
-// 	}
+		default:
+			log.Warn().Str("exchange", exName).Msg("unknown exchange, skipping")
+		}
+	}
 
-// 	if len(clients) == 0 {
-// 		return nil, fmt.Errorf("no perpetual order clients available (no enabled exchanges with order support)")
-// 	}
+	if len(clients) == 0 {
+		return nil, fmt.Errorf("no perpetual order clients available (no enabled exchanges with order support)")
+	}
 
-// 	log.Info().
-// 		Int("exchanges", len(clients)).
-// 		Msg("✓ All enabled perpetual order clients initialized")
+	log.Info().
+		Int("exchanges", len(clients)).
+		Msg("✓ All enabled perpetual order clients initialized")
 
-// 	// 如果只有两个交易所（向后兼容），使用标准 NewOrderManager
-// 	if len(clients) == 2 {
-// 		var binanceClient, bybitClient domainservice.OrderClient
-// 		if bc, ok := clients["BINANCE"]; ok {
-// 			binanceClient = bc
-// 		}
-// 		if bc, ok := clients["BYBIT"]; ok {
-// 			bybitClient = bc
-// 		}
-// 		return domainservice.NewOrderManager(binanceClient, bybitClient), nil
-// 	}
+	// 如果只有两个交易所（向后兼容），使用标准 NewOrderManager
+	if len(clients) == 2 {
+		var binanceClient, bybitClient domainservice.OrderClient
+		if bc, ok := clients["BINANCE"]; ok {
+			binanceClient = bc
+		}
+		if bc, ok := clients["BYBIT"]; ok {
+			bybitClient = bc
+		}
+		return domainservice.NewOrderManager(binanceClient, bybitClient), nil
+	}
 
-// 	// 如果有多于两个交易所，使用新的构造函数支持所有交易所
-// 	return domainservice.NewOrderManagerWithClients(clients), nil
-// }
+	// 如果有多于两个交易所，使用新的构造函数支持所有交易所
+	return domainservice.NewOrderManagerWithClients(clients), nil
+}

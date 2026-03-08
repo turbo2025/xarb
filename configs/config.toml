@@ -20,6 +20,7 @@ webhook = "https://open.feishu.cn/open-apis/bot/v2/hook/5e3917f8-14de-4855-a9bb-
 secret = "PjeS66quKWulErS9l4XCde"
 
 [symbols]
+# base
 coins = ["BTC", "ETH", "SOL"]
 quote = "USDT"
 
